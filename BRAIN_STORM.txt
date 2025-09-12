@@ -1,0 +1,39 @@
+What we see in page, at first load we want to either create new project OR load project
+For now lets focus on new project. i see this window as modal or floating window
+
+upon load go to main page
+
+this is what i should see:
+
+1. Resources Tab (like sprites, sounds, objects, rooms, functions, scripts, etc...)
+2. Tool bar (For Running game, (file) new project, build project and other stuff)
+
+//// Resources Tab
+/// Sprites
+lets do sprite composer first, when sprites is right clicked, i can either create a sprite or a folder
+adding a folder just creates folder, then in sprite when pressed, itll open a file dialog box
+after opening a file dialog box, i can pick png images, when picked, itll load it into a sprite grid floating window
+where i should see:
+
+ I. Properties Tab
+  -1. Origin
+   0. sprite name column field
+   1. rows and columns field
+   2. width and height field
+   3. gap field
+   4. Preview Window (Looped animation of what will it look like)
+   5. Speed (Set fps to play the animation)
+
+ II. Sprite Image Grid Panel
+   1. Grids (boxes) that selectes individual sprites
+
+ III. Actions
+   1. Save (Upon save, itll create a json that contains information of that sprite (x, y, w, h) per each box) (save as that file)
+   2. Cancel (Which magically closes the floating window.)
+
+Double clicking the sprite will just open the sprite grid floating window 
+again with loaded data (corresponds to whats been clicked)
+
+/// OBJECTS
+thats for sprite, lets now focus on objects:
+same as sprite, when right clicked, i can add either object or folder
