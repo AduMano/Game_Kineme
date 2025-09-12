@@ -1,59 +1,90 @@
-# Game Editor Specification
+# Game Editor Pages Specification
 
-## 📌 Navigator
-- [Resources Tab](#resources-tab)
-  - [Sprites](#sprites)
-  - [Objects](#objects)
-  - [Rooms](#rooms)
-  - [Sounds](#sounds)
-  - [Scripts](#scripts)
-  - [Functions](#functions)
-- [Pages](#pages)
+## Navigator
+- [Main Page](#main-page)
+  - [Toolbar](#toolbar)
+    - [File](#file)
+    - [Run / Play](#run--play)
+  - [Resources Tab](#resources-tab)
+    - [Sprites](#sprites)
+    - [Objects](#objects)
+    - [Rooms](#rooms)
+    - [Sounds](#sounds)
+    - [Scripts](#scripts)
+    - [Functions](#functions)
+- [Simulate Game / Run Game Page](#simulate-game--run-game-page)
+    - [Panels](#panels)
+
+---
+
+## Main Page
+At first load we want to either **create new project** or **load project**.  
+For now, we focus on **new project**. This is shown as a modal or floating window.  
+
+Upon load → go to **Main Page**.  
+This page contains:
+
+1. **Resources Tab** (sprites, sounds, objects, rooms, functions, scripts, etc.)  
+2. **Toolbar** (for running game, creating new project, building project, etc.)  
+
+---
+
+## Toolbar
+
+### File
+Like in other software, the File menu provides a dropdown with:
+1. New Project  
+2. Open Project  
+3. Save Project  
+
+### Run / Play
+- Runs the game by loading all resources into one object.  
+- Saves data in **localStorage**.  
+- Opens a new tab to test the game.  
+- If not visited, data expires in 2 minutes.  
+- When the tab/browser is closed, localStorage is cleaned to avoid bugs.  
 
 ---
 
 ## Resources Tab
-Like sprites, sounds, objects, rooms, functions, scripts, etc...
-
----
 
 ### Sprites
-- Right click → create **Sprite** or **Folder**
-- Adding a folder → just creates folder
-- Clicking **Sprite** → opens a file dialog box
-- After picking PNG images → loads into a **Sprite Grid Floating Window**
+- Right click → create **Sprite** or **Folder**.  
+- Adding a folder → just creates folder.  
+- Clicking **Sprite** → opens a file dialog to select PNG images.  
+- After picking, images load into a **Sprite Grid Floating Window**.  
 
 #### Sprite Grid Floating Window
 **I. Properties Tab**
 1. Origin  
-0. Sprite name column field  
-1. Rows and columns field  
-2. Width and height field  
+0. Sprite name field  
+1. Rows and columns  
+2. Width and height  
 3. Gap field  
-4. Preview Window (Looped animation preview)  
-5. Speed (FPS for animation playback)  
+4. Preview Window (looped animation)  
+5. Speed (FPS playback)  
 
 **II. Sprite Image Grid Panel**
-- Grids (boxes) to select individual sprites  
+- Grid boxes for selecting individual sprites  
 
 **III. Actions**
-1. Save → creates JSON with sprite data (`x, y, w, h` per box)  
+1. Save → creates JSON with sprite info (`x, y, w, h` per box)  
 2. Cancel → closes the floating window  
 
-- Double clicking sprite → reopens sprite grid floating window with saved data  
+- Double-clicking a sprite reopens the grid window with saved data.  
 
 ---
 
 ### Objects
-- Right click → add **Object** or **Folder**
-- Adding Object → opens a floating window  
+- Right click → add **Object** or **Folder**.  
+- Adding Object → opens floating window.  
 
 #### Object Window
 **I. Properties**
-1. Name field  
+1. Name  
 2. Default Sprite (select from sprites)  
 3. Collision Box (select sprites)  
-4. Preview Window (plays default sprite with collision box hovered)  
+4. Preview Window (plays sprite + collision hover)  
 
 **II. Sub Side Nav**
 1. On Create Event  
@@ -67,15 +98,15 @@ Like sprites, sounds, objects, rooms, functions, scripts, etc...
 3. Export Script  
 
 **IV. Actions**
-1. Save Button  
-2. Cancel Button  
-3. Close Button  
+1. Save  
+2. Cancel  
+3. Close  
 
 ---
 
 ### Rooms
-- Right click → add **Room** or **Folder**
-- Adding Room → opens a floating window  
+- Right click → add **Room** or **Folder**.  
+- Adding Room → opens floating window.  
 
 #### Room Window
 **I. Properties**
@@ -85,14 +116,14 @@ Like sprites, sounds, objects, rooms, functions, scripts, etc...
 4. Grid Size  
 5. Layers (Dynamic)  
    - Add Layer Button  
-   - Name Layer List Item  
+   - Name Layer Item  
    - Remove Icon  
-   - Rename Icon (Label → Input, readonly by default)  
-6. Selected Object (pick from existing objects)  
+   - Rename Icon (label → input, readonly default)  
+6. Selected Object (pick from objects folder)  
 7. Camera (per room)  
-   - Width (default `1080px`)  
-   - Height (default `720px`)  
-   - Following (default: none, can follow object)  
+   - Width (default 1080px)  
+   - Height (default 720px)  
+   - Following (none by default, select object)  
    - Panning Movement Speed  
    - Filter?  
 
@@ -103,15 +134,15 @@ Like sprites, sounds, objects, rooms, functions, scripts, etc...
 ---
 
 ### Sounds
-- Right click → add **Sound** or **Folder**  
-- Supports `.ogg` or `.mp3` files  
-- Files can be dropped into the folder  
+- Right click → add **Sound** or **Folder**.  
+- Supports `.ogg` and `.mp3`.  
+- Files can be dropped in.  
 
 ---
 
 ### Scripts
-- Scripts = multiple tasks (e.g., story progression, dialog, global executions)  
-- Right click → add **Script** or **Folder**
+- Scripts = multiple tasks (e.g., dialog system, global execution).  
+- Right click → add **Script** or **Folder**.  
 
 #### Script Editor
 **I. Rich Code Editor with JavaScript Linting**
@@ -123,8 +154,8 @@ Like sprites, sounds, objects, rooms, functions, scripts, etc...
 ---
 
 ### Functions
-- Functions = single task, can return a value  
-- Examples: collision detection, logic helpers  
+- Functions = single task, can return values.  
+- Examples: collision detection, logic operations.  
 
 #### Function Editor
 **I. Rich Code Editor with JavaScript Linting**
@@ -135,5 +166,16 @@ Like sprites, sounds, objects, rooms, functions, scripts, etc...
 
 ---
 
-## Pages
-*(Reserved section)*
+## Simulate Game / Run Game Page
+Triggered when pressing **Run/Play** in the toolbar.  
+- Loads saved data from **localStorage**.  
+- Displays a loading screen.  
+- Renders game via **Canvas**.  
+
+---
+
+### Panels
+1. Canvas  
+2. Side Panel → Console Debugging  
+3. Bottom Panel → Debug Window  
+4. Debug Overlay on Canvas (FPS, other stats)  
