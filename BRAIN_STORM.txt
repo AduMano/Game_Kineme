@@ -52,10 +52,14 @@ When i add an object, this will display a floating window. this is what I should
    4. On Destroy Event
 
  III. Rich Text Editor JavaScript Linting
+   1. Save Script
+   2. Load Script
+   3. Export Script
 
  IV. Actions
     1. Save Button
     2. Cancel Button
+    3. Close Button
 
 
 /// ROOMS
@@ -84,3 +88,32 @@ this is what i should see:
   II. Room Panel 
     1. Grid Area
     2. Camera Border
+
+
+/// SOUNDS 
+Besides adding .ogg files or mp3 stuff i dont know what to do, maybe I should make it as object? i dunno.
+anyways, so here, like others, when right clicked it can either add a sound or folder. for now lets just drop
+mp3 or ogg files in this folder
+
+
+/// SCRIPTS 
+Whats this? scripts? whats the difference between scripts and functions?
+scripts tend to execute multiple tasks, I can use this for story progressing 
+Dialog box or global executions. When right clicked, i can either add script or folder.
+WHen adding a script, this is what I should see:
+
+ I. Rich Code Editor JavaScript Linting 
+   1. Save Script
+   2. Load Script
+   3. Export Script
+   4. Close Button
+
+/// FUNCTIONS 
+This is a normal funtion that only tend to execute one task, and it can return something
+unlike scripts. and can be used for example collision detections and other logic stuff
+
+ I. Rich Code Editor JavaScript Linting 
+   1. Save Script
+   2. Load Script
+   3. Export Script
+   4. Close Button
