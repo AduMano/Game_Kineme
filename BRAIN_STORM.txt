@@ -1,15 +1,32 @@
 What we see in page, at first load we want to either create new project OR load project
 For now lets focus on new project. i see this window as modal or floating window
 
+//// PAGES
+[Main Page]
 upon load go to main page
 
 this is what i should see:
 
 1. Resources Tab (like sprites, sounds, objects, rooms, functions, scripts, etc...)
-2. Tool bar (For Running game, (file) new project, build project and other stuff)
+2. Toolbar (For Running game, (file) new project, build project and other stuff)
 
-//// Resources Tab
-/// Sprites
+/// Toolbar
+// File
+like in other software, we also have file tool nav, for creating new, opening existing or save. 
+When i click on it, a dropdown must display showing these Items:
+ 1. New Project
+ 2. Open Project
+ 3. Save Project
+
+// Run / play
+this button runs the game, itll load all the data first into one object, gather every resources path
+then save them in localstorage, have the window open a new tab and redirect user there to test the game
+by loading the data in localstorage, if not visited, itll expire in 2 minutes. When the tab is closed
+or the browser itl clean up and delete the saved data to prevent bugged game play testing.
+
+
+/// Resources Tab
+// Sprites
 lets do sprite composer first, when sprites is right clicked, i can either create a sprite or a folder
 adding a folder just creates folder, then in sprite when pressed, itll open a file dialog box
 after opening a file dialog box, i can pick png images, when picked, itll load it into a sprite grid floating window
@@ -34,7 +51,7 @@ where i should see:
 Double clicking the sprite will just open the sprite grid floating window 
 again with loaded data (corresponds to whats been clicked)
 
-/// OBJECTS
+// OBJECTS
 thats for sprite, lets now focus on objects:
 same as sprite, when right clicked, i can add either object or folder.
 When i add an object, this will display a floating window. this is what I should see:
@@ -62,7 +79,7 @@ When i add an object, this will display a floating window. this is what I should
     3. Close Button
 
 
-/// ROOMS
+// ROOMS
 thats for Objects, now imma focus on Rooms.
 Same as others, It can create folder and room itself. when i create a room, 
 this is what i should see:
@@ -90,13 +107,13 @@ this is what i should see:
     2. Camera Border
 
 
-/// SOUNDS 
+// SOUNDS 
 Besides adding .ogg files or mp3 stuff i dont know what to do, maybe I should make it as object? i dunno.
 anyways, so here, like others, when right clicked it can either add a sound or folder. for now lets just drop
 mp3 or ogg files in this folder
 
 
-/// SCRIPTS 
+// SCRIPTS 
 Whats this? scripts? whats the difference between scripts and functions?
 scripts tend to execute multiple tasks, I can use this for story progressing 
 Dialog box or global executions. When right clicked, i can either add script or folder.
@@ -108,7 +125,7 @@ WHen adding a script, this is what I should see:
    3. Export Script
    4. Close Button
 
-/// FUNCTIONS 
+// FUNCTIONS 
 This is a normal funtion that only tend to execute one task, and it can return something
 unlike scripts. and can be used for example collision detections and other logic stuff
 
@@ -118,4 +135,14 @@ unlike scripts. and can be used for example collision detections and other logic
    3. Export Script
    4. Close Button
 
-//// PAGES
+
+[Simulate Game / Run Game Page]
+at this point the user had pressed the play / run button at toolbar, where itll load the data thats
+been saved inside the localstorage, (shows loading). then after load itll render the game via canvas
+
+There are few elements thats need to be present and there are:
+
+ 1. Canvas
+ 2. Side Panel for Console Debugging
+ 3. Bottom Panel for Debug Window
+ 4. Debug Overlay on Canvas like FPS or other stuff
