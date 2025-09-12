@@ -36,4 +36,51 @@ again with loaded data (corresponds to whats been clicked)
 
 /// OBJECTS
 thats for sprite, lets now focus on objects:
-same as sprite, when right clicked, i can add either object or folder
+same as sprite, when right clicked, i can add either object or folder.
+When i add an object, this will display a floating window. this is what I should see:
+
+ I. Properties
+   1. Name field
+   2. Default Sprite (selection from sprites)
+   3. Collision Box (select sprites)
+   4. Preview Window of playing the default sprite while collision box hovered
+
+ II. Sub Side Nav
+   1. On Create Event
+   2. On Update Event
+   3. On Draw Event
+   4. On Destroy Event
+
+ III. Rich Text Editor JavaScript Linting
+
+ IV. Actions
+    1. Save Button
+    2. Cancel Button
+
+
+/// ROOMS
+thats for Objects, now imma focus on Rooms.
+Same as others, It can create folder and room itself. when i create a room, 
+this is what i should see:
+
+ I. Properties 
+   1. Name
+   2. Width 
+   3. height
+   4. Grid Size 
+   5. Layers (Dynamic) (When one is selected, the others go low opacity)
+     * Add Layer Button
+     * Name Layer List Item
+     * Remove Icon
+     * Rename Icon (Label becomes Input. its input just readonly)
+   6. Selected Object (Pick from existing objects inside objects folder)
+   7. Camera (Object but embeded to each existing room)
+     * Width (default 1080px)
+     * Height (default 720px)
+     * Following (Default to none, but can select object to follow)
+     * Panning Movement Speed
+     * Filter?
+
+  II. Room Panel 
+    1. Grid Area
+    2. Camera Border
