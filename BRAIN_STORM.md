@@ -1,5 +1,8 @@
 # Game Editor Pages Specification
 
+## Figma Layout
+- [Figma](https://www.figma.com/design/WcLyrR4o7qwwMOWxIgMIFe/GAME_KINEME?node-id=0-1&t=74MeCvBuDJjGC55a-1)
+
 ## Navigator
 - [Main Page](#main-page)
   - [Toolbar](#toolbar)
