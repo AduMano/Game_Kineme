@@ -6,5 +6,5 @@ export interface IResourcesItem {
   className?: string;
 
   subDirectory?: IResourcesItem[];
-  colorIndex?: number;
+  level?: number;
 }

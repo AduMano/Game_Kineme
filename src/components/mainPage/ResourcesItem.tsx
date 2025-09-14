@@ -3,15 +3,15 @@ import type { IResourcesItem } from "../../types/ResourcesItemTypes";
 import { IconRenderer } from "../IconRenderer";
 import { NESTED_COLORS } from "../../Constants";
 
-const FolderItem = ({ icon, label, className, subDirectory, colorIndex }: IResourcesItem) => {
-  const currentColor = NESTED_COLORS[colorIndex! % NESTED_COLORS.length];
+const FolderItem = ({ icon, label, className, subDirectory, level }: IResourcesItem) => {
+  const currentColor = NESTED_COLORS[level! % NESTED_COLORS.length];
 
   return (
     <Disclosure>
       {({ open }) => (
         <>
           <DisclosureButton
-            style={{ borderColor: colorIndex! > 0 ? currentColor : "none" }}
+            style={{ borderColor: level! > 0 ? currentColor : "none" }}
             onContextMenu={(e) => e.preventDefault()}
             className={
               `w-full px-4 py-2 relative flex items-center gap-x-4 ${className}
@@ -22,8 +22,8 @@ const FolderItem = ({ icon, label, className, subDirectory, colorIndex }: IResou
           >
             <IconRenderer
               icon={icon}
-              width={colorIndex! > 0 ? 16 : 20}
-              height={colorIndex! > 0 ? 16 : 20}
+              width={level! > 0 ? 16 : 20}
+              height={level! > 0 ? 16 : 20}
             />
             <h1 className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
             <IconRenderer className="relative flex justify-end text-right flex-1" icon={open ? "ChevronDown" : "ChevronRight"} width={16} height={16} />
@@ -33,7 +33,7 @@ const FolderItem = ({ icon, label, className, subDirectory, colorIndex }: IResou
             {
               subDirectory!.length !== 0 ?
                 subDirectory!.map((sub, index) => (
-                  <ResourcesItem key={index} icon={sub.icon} label={sub.label} className={`${sub.className}`} subDirectory={sub.subDirectory} colorIndex={(colorIndex! + 1)} />
+                  <ResourcesItem key={index} icon={sub.icon} label={sub.label} className={`${sub.className}`} subDirectory={sub.subDirectory} level={(level! + 1)} />
                 )) :
                 (
                   <span className="relative text-center my-2 block text-sm text-c-darker">Empty</span>
@@ -46,12 +46,12 @@ const FolderItem = ({ icon, label, className, subDirectory, colorIndex }: IResou
   )
 };
 
-const FileItem = ({ icon, label, className, colorIndex }: IResourcesItem) => {
-  const currentColor = NESTED_COLORS[colorIndex! % NESTED_COLORS.length];
+const FileItem = ({ icon, label, className, level }: IResourcesItem) => {
+  const currentColor = NESTED_COLORS[level! % NESTED_COLORS.length];
 
   return (
     <div
-      style={{ borderColor: colorIndex! > 0 ? `${currentColor}` : "" }}
+      style={{ borderColor: level! > 0 ? `${currentColor}` : "" }}
       onContextMenu={(e) => e.preventDefault()}
       className={
         `w-full px-4 py-2 relative flex items-center gap-x-4 ${className}
@@ -65,11 +65,11 @@ const FileItem = ({ icon, label, className, colorIndex }: IResourcesItem) => {
   )
 };
 
-export const ResourcesItem = ({ icon = "File", label = "Item", className = "", subDirectory = [], colorIndex = 0 }: IResourcesItem) => (
+export const ResourcesItem = ({ icon = "File", label = "Item", className = "", subDirectory = [], level = 0 }: IResourcesItem) => (
   <>
     {icon === "Folder" ?
-      (FolderItem({ icon, label, className, subDirectory, colorIndex })) :
-      (FileItem({ icon, label, className, colorIndex }))
+      (FolderItem({ icon, label, className, subDirectory, level })) :
+      (FileItem({ icon, label, className, level }))
     }
   </>
 );
