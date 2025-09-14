@@ -3,7 +3,7 @@ import type { IResourcesItem } from "../../types/ResourcesItemTypes";
 import { IconRenderer } from "../IconRenderer";
 import { NESTED_COLORS } from "../../Constants";
 
-const FolderItem = ({ icon, label, className, subDirectory, level }: IResourcesItem) => {
+const FolderItem = ({ label, className, subDirectory, level }: IResourcesItem) => {
   const currentColor = NESTED_COLORS[level! % NESTED_COLORS.length];
 
   return (
@@ -21,11 +21,11 @@ const FolderItem = ({ icon, label, className, subDirectory, level }: IResourcesI
             `}
           >
             <IconRenderer
-              icon={icon}
+              icon={open ? "OpenFolder" : "Folder"}
               width={level! > 0 ? 16 : 20}
               height={level! > 0 ? 16 : 20}
             />
-            <h1 className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
+            <h1 title={label} className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
             <IconRenderer className="relative flex justify-end text-right flex-1" icon={open ? "ChevronDown" : "ChevronRight"} width={16} height={16} />
           </DisclosureButton>
 
@@ -60,7 +60,7 @@ const FileItem = ({ icon, label, className, level }: IResourcesItem) => {
       }
     >
       <IconRenderer icon={icon} width={16} height={16} />
-      <h1 className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
+      <h1 title={label} className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
     </div>
   )
 };
