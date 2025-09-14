@@ -20,7 +20,11 @@ const FolderItem = ({ icon, label, className, subDirectory, colorIndex }: IResou
               ${className}
             `}
           >
-            <IconRenderer icon={icon} width={20} height={20} />
+            <IconRenderer
+              icon={icon}
+              width={colorIndex! > 0 ? 16 : 20}
+              height={colorIndex! > 0 ? 16 : 20}
+            />
             <h1 className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
             <IconRenderer className="relative flex justify-end text-right flex-1" icon={open ? "ChevronDown" : "ChevronRight"} width={16} height={16} />
           </DisclosureButton>
@@ -55,7 +59,7 @@ const FileItem = ({ icon, label, className, colorIndex }: IResourcesItem) => {
         select-none border-l-2`
       }
     >
-      <IconRenderer icon={icon} width={20} height={20} />
+      <IconRenderer icon={icon} width={16} height={16} />
       <h1 className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
     </div>
   )
