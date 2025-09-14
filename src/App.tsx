@@ -1,16 +1,16 @@
 import { Route, Routes } from 'react-router-dom';
 
+// Pages
+import { MainPage } from './pages/MainPage';
+import { RenderGamePage } from './pages/RenderGamePage';
+
 function App() {
   return (
-    <div className="">
-      <main>
+    <div className="fixed w-[100%] h-[100%]">
+      <main className='relative w-full h-[100%]'>
         <Routes>
-          <Route path="/" element={
-            <div className="bg-red-500">
-              <h1 className="text-white text-center text-6xl">HELLO WORLD</h1>
-            </div>
-          }
-          />
+          <Route path="/" Component={MainPage} />
+          <Route path="/Run" Component={RenderGamePage} />
         </Routes>
       </main>
     </div>

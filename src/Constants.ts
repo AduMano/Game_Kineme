@@ -1,0 +1,1 @@
+export const NESTED_COLORS = ["#5afa48", "#fa9848", "#fa4848"];
