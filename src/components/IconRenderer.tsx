@@ -3,7 +3,10 @@ import type { IIConRenderer, TIcon } from "../types/IconRendererTypes";
 import {
   ChevronDownIcon, ChevronRightIcon, CodeBracketSquareIcon, PhotoIcon, DocumentIcon,
   DocumentCheckIcon, DocumentPlusIcon, FolderIcon, FolderOpenIcon, HomeIcon, PlayIcon,
-  SpeakerWaveIcon, CubeIcon
+  SpeakerWaveIcon, CubeIcon,
+  TrashIcon,
+  PencilSquareIcon,
+  DocumentMagnifyingGlassIcon
 } from "@heroicons/react/24/outline";
 
 export const IconRenderer = ({
@@ -27,6 +30,9 @@ export const IconRenderer = ({
     ChevronRight: <ChevronRightIcon width={width} height={height} />,
     ChevronDown: <ChevronDownIcon width={width} height={height} />,
     NewFile: <DocumentPlusIcon width={width} height={height} />,
+    Trash: <TrashIcon width={width} height={height} />,
+    Pencil: <PencilSquareIcon width={width} height={height} />,
+    MagnifyingGlass: <DocumentMagnifyingGlassIcon width={width} height={height} />,
   };
 
   return <div className={className}>{Icons[icon]}</div>;

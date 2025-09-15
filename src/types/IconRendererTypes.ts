@@ -11,7 +11,10 @@ export type TIcon =
   | "Save"
   | "Play"
   | "ChevronRight"
-  | "ChevronDown";
+  | "ChevronDown"
+  | "Trash"
+  | "Pencil"
+  | "MagnifyingGlass";
 
 export interface IIConRenderer {
   icon: TIcon;
