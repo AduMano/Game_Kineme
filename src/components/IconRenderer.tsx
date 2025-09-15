@@ -6,7 +6,9 @@ import {
   SpeakerWaveIcon, CubeIcon,
   TrashIcon,
   PencilSquareIcon,
-  DocumentMagnifyingGlassIcon
+  DocumentMagnifyingGlassIcon,
+  FolderArrowDownIcon,
+  CircleStackIcon
 } from "@heroicons/react/24/outline";
 
 export const IconRenderer = ({
@@ -33,6 +35,8 @@ export const IconRenderer = ({
     Trash: <TrashIcon width={width} height={height} />,
     Pencil: <PencilSquareIcon width={width} height={height} />,
     MagnifyingGlass: <DocumentMagnifyingGlassIcon width={width} height={height} />,
+    FolderArrowDown: <FolderArrowDownIcon width={width} height={height} />,
+    CircleStack: <CircleStackIcon width={width} height={height} />,
   };
 
   return <div className={className}>{Icons[icon]}</div>;

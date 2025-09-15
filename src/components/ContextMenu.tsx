@@ -41,7 +41,7 @@ const ContextMenu = ({ x, y, items, onClose, width = 180 }: ContextMenuProps) =>
               onClose()
             }
           }}
-          className={`px-3 py-2 cursor-pointer ${item.disabled ? "text-gray-400 cursor-not-allowed" : "hover:bg-gray-200"
+          className={`px-3 py-2 flex items-center cursor-pointer ${item.disabled ? "text-gray-400 cursor-not-allowed" : "hover:bg-gray-200"
             }`}
         >
           {item.icon && <span className="mr-2 inline-block">{item.icon}</span>}

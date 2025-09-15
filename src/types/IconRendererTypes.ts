@@ -14,7 +14,9 @@ export type TIcon =
   | "ChevronDown"
   | "Trash"
   | "Pencil"
-  | "MagnifyingGlass";
+  | "MagnifyingGlass"
+  | "CircleStack"
+  | "FolderArrowDown";
 
 export interface IIConRenderer {
   icon: TIcon;
