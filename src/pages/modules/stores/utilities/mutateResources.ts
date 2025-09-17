@@ -1,5 +1,5 @@
 import type { TIcon } from "../../../../types/IconRendererTypes";
-import type { IResourcesItem } from "../../../../types/ResourcesItemTypes";
+import type { IResourcesItem, TFromDirectory } from "../../../../types/ResourcesItemTypes";
 import type { IMutateResourcesItem } from "../useResourcesStore";
 import cuid from 'cuid';
 
@@ -83,26 +83,49 @@ export const UTIL_REMOVE_ITEM_BY_ID = (
       : item
   );
 
-export const UTIL_RENAME_ITEM_BY_ID = (
-  items: IResourcesItem[],
+export const UTIL_RENAME_ITEM_BY_ID_PATH = (
+  resources: IResourcesItem[],
+  fromDirectory: TFromDirectory,
+  level: number,
   idToRename: string,
   newName: string
 ): IResourcesItem[] => {
-  return items.map(item => {
-    if (item.id === idToRename) {
-      return {
-        ...item,
-        label: newName,
-      };
-    }
+  return resources.map(item => {
+    if (item.fromDirectory !== fromDirectory) return item;
 
-    if (item.subDirectory) {
-      return {
-        ...item,
-        subDirectory: UTIL_RENAME_ITEM_BY_ID(item.subDirectory, idToRename, newName),
-      };
-    }
+    const renameRecursive = (
+      currentItems: IResourcesItem[],
+      currentLevel: number
+    ): IResourcesItem[] => {
+      return currentItems.map(child => {
+        if (currentLevel === level && child.id === idToRename) {
+          const hasDuplicate = currentItems.some(
+            sibling => sibling.id !== idToRename && sibling.label === newName
+          );
+          if (hasDuplicate) {
+            throw new Error(
+              `An item named "${newName}" already exists at level ${level}.`
+            );
+          }
+          return { ...child, label: newName };
+        }
 
-    return item;
+        if (child.subDirectory) {
+          return {
+            ...child,
+            subDirectory: renameRecursive(child.subDirectory, currentLevel + 1),
+          };
+        }
+
+        return child;
+      });
+    };
+
+    return {
+      ...item,
+      subDirectory: item.subDirectory
+        ? renameRecursive(item.subDirectory, 1)
+        : item.subDirectory,
+    };
   });
 };

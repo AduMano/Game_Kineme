@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { IResourcesItem, TFromDirectory } from '../../../types/ResourcesItemTypes';
-import { UTIL_ADD_ITEM, UTIL_REMOVE_ITEM_BY_ID } from './utilities/mutateResources';
+import { UTIL_ADD_ITEM, UTIL_REMOVE_ITEM_BY_ID, UTIL_RENAME_ITEM_BY_ID_PATH } from './utilities/mutateResources';
 import { UTIL_SORT_SOURCES } from './utilities/sortResources';
 
 interface ResourcesState {
@@ -8,6 +8,7 @@ interface ResourcesState {
   setResources: (newResources: IResourcesItem[]) => void,
   addItem: (payload: IMutateResourcesItem) => void,
   removeItem: (payload: IMutateResourcesItem) => void,
+  renameItem: (payload: IMutateResourcesItem) => boolean,
 }
 
 export interface IMutateResourcesItem {
@@ -43,6 +44,29 @@ export const useResourcesStore = create<ResourcesState>((set) => ({
     set(state => ({
       resources: UTIL_REMOVE_ITEM_BY_ID(state.resources, payload.id!)
     })),
+
+  renameItem: (payload: IMutateResourcesItem) => {
+    let isValid = true;
+
+    set(state => {
+      try {
+        const renamedItemResources = UTIL_RENAME_ITEM_BY_ID_PATH(state.resources, payload.directory, payload.level, payload.id!, payload.name!);
+        return ({
+          resources: UTIL_SORT_SOURCES(renamedItemResources)
+        });
+      }
+      catch (err: any) {
+        alert(err.message);
+
+        isValid = false;
+        return ({
+          resources: state.resources
+        });
+      }
+    });
+
+    return isValid;
+  }
 }));
 
 // [

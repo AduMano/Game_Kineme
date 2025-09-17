@@ -3,24 +3,26 @@ import type { IResourcesItem } from "../../types/ResourcesItemTypes";
 import { IconRenderer } from "../IconRenderer";
 import { NESTED_COLORS } from "../../Constants";
 import ContextMenu from "../ContextMenu";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type { ContextMenuItem } from "../../types/ContextMenuTypes";
 import { useResourcesStore } from "../../pages/modules/stores/useResourcesStore";
-import { UTIL_RENAME_ITEM_BY_ID } from "../../pages/modules/stores/utilities/mutateResources";
+import { useGlobalClick } from "../../hooks/useGlobalClick";
 
 const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, level, parent }: IResourcesItem) => {
   const currentColor = NESTED_COLORS[level! % NESTED_COLORS.length];
+  const disclosureRef = useRef<HTMLButtonElement | null>(null)
+  const [isOpen, setOpenState] = useState<boolean>(false);
   const [isNaming, setNamingState] = useState<boolean>(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [menuItems, setMenuItems] = useState<ContextMenuItem[]>([]);
   const nameField = useRef<HTMLInputElement>(null);
-  const resources = useResourcesStore(state => state.resources);
   const addItem = useResourcesStore(state => state.addItem);
   const removeItem = useResourcesStore(state => state.removeItem);
+  const renameItem = useResourcesStore(state => state.renameItem);
 
   const handleAddItem = (type: "Folder" | "File") => {
     // Ask user first what to name, can be cancelled or confirm
-    console.log("ADDING");
+    if (!isOpen) disclosureRef?.current?.click();
     // Then Add
     addItem({
       isFolder: type === "Folder",
@@ -49,8 +51,13 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
       return;
     }
     else {
-      UTIL_RENAME_ITEM_BY_ID(resources, id!, name);
-      setNamingState(false);
+      const isRenamed = renameItem({
+        directory: fromDirectory,
+        level, id, name,
+      });
+
+      if (isRenamed) setNamingState(false);
+      else nameField!.current!.style.borderBottomColor = "red";
     }
   }
 
@@ -73,12 +80,21 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
     );
   }
 
+  useEffect(() => {
+    isNaming && nameField!.current!.focus();
+  }, [isNaming]);
+
+  useGlobalClick(() => {
+    if (isNaming) setNamingState(false);
+  }, nameField as RefObject<HTMLElement>);
+
   return (
     <>
       <Disclosure>
         {({ open }) => (
           <>
             <DisclosureButton
+              ref={disclosureRef}
               style={{ borderColor: level! > 0 ? currentColor : "none" }}
               onContextMenu={(e) => handleContextMenu(e)}
               className={
@@ -88,10 +104,19 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
               ${className}
             `}
               onClick={(e) => {
-                if (!isNaming) setMenuPos(null);
-                else e.preventDefault();
+                if (isNaming) e.preventDefault();
+                else {
+                  setMenuPos(null);
+                  setOpenState(current => !current);
+                }
               }}
-              onKeyDown={e => e.preventDefault()}
+              onKeyDown={e => {
+                if (e.key === "Enter") e.preventDefault();
+                else if (e.key.trim() === "") {
+                  e.preventDefault();
+                  nameField!.current!.value += " ";
+                }
+              }}
             >
               <IconRenderer
                 icon={open ? "OpenFolder" : "Folder"}
@@ -105,7 +130,6 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
                   style={{ borderBottomColor: "gray" }}
                   className="relative w-[80%] text-left border-b-2 border-gray-600 bg-transparent outline-none"
                   onKeyDown={(e) => e.key === "Enter" && handleRenameItem(e.currentTarget.value)}
-                  onLoad={(e) => e.currentTarget.focus()}
                 />
               ) : (
                 <h1 title={label} className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
@@ -117,7 +141,7 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
               {
                 subDirectory!.length !== 0 ?
                   subDirectory!.map((sub, index) => (
-                    <ResourcesItem key={index} fromDirectory={sub.fromDirectory} icon={sub.icon} label={sub.label} className={`${sub.className}`} subDirectory={sub.subDirectory} level={(level! + 1)} />
+                    <ResourcesItem key={index} id={sub.id} fromDirectory={sub.fromDirectory} icon={sub.icon} label={sub.label} className={`${sub.className}`} subDirectory={sub.subDirectory} level={(level! + 1)} />
                   )) :
                   (
                     <span className="relative text-center my-2 block text-sm text-c-darker">Empty</span>
@@ -126,7 +150,7 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
             </DisclosurePanel>
           </>
         )}
-      </Disclosure>
+      </Disclosure >
 
       {menuPos && (
         <ContextMenu
@@ -135,15 +159,49 @@ const FolderItem = ({ id, fromDirectory, icon, label, className, subDirectory, l
           items={menuItems}
           onClose={() => setMenuPos(null)}
         />
-      )}
+      )
+      }
     </>
   )
 };
 
-const FileItem = ({ id, fromDirectory, icon, label, className, level }: IResourcesItem) => {
+const FileItem = ({ id, fromDirectory, icon, label, className, level, parent, }: IResourcesItem) => {
   const currentColor = NESTED_COLORS[level! % NESTED_COLORS.length];
+  const nameField = useRef<HTMLInputElement | null>(null);
+  const [isNaming, setNamingState] = useState<boolean>(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [menuItems, setMenuItems] = useState<ContextMenuItem[]>([]);
+  const renameItem = useResourcesStore(state => state.renameItem);
+  const removeItem = useResourcesStore(state => state.removeItem);
+
+  const handleRemoveItem = () => {
+    // Ask user first if they really want to delete it
+    removeItem({
+      id: id!,
+      directory: fromDirectory,
+      level: level!
+    });
+  }
+
+  const handleRenameItem = (textValue: string) => {
+    const name = textValue.trim();
+    if (
+      name === "" ||
+      parent?.subDirectory?.some(file => file.icon === "Folder" && file.label === name)
+    ) {
+      nameField!.current!.style.borderBottomColor = "red";
+      return;
+    }
+    else {
+      const isRenamed = renameItem({
+        directory: fromDirectory,
+        level, id, name,
+      });
+
+      if (isRenamed) setNamingState(false);
+      else nameField!.current!.style.borderBottomColor = "red";
+    }
+  }
 
   const handleContextMenu = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.preventDefault();
@@ -151,12 +209,20 @@ const FileItem = ({ id, fromDirectory, icon, label, className, level }: IResourc
 
     const baseItems = [
       { icon: <IconRenderer icon="MagnifyingGlass" width={16} height={16} />, label: "Open", onClick: () => alert("Opening") },
-      { icon: <IconRenderer icon="Pencil" width={16} height={16} />, label: `Rename`, onClick: () => alert(`Renaming ${icon}`) },
-      { icon: <IconRenderer icon="Trash" width={16} height={16} />, label: `Delete`, onClick: () => alert(`Delete ${icon}`) },
+      { icon: <IconRenderer icon="Pencil" width={16} height={16} />, label: `Rename`, onClick: () => setNamingState(true) },
+      { icon: <IconRenderer icon="Trash" width={16} height={16} />, label: `Delete`, onClick: () => handleRemoveItem() },
     ];
 
     setMenuItems(baseItems);
   }
+
+  useEffect(() => {
+    isNaming && nameField!.current!.focus();
+  }, [isNaming]);
+
+  useGlobalClick(() => {
+    if (isNaming) setNamingState(false);
+  });
 
   return (
     <>
@@ -170,7 +236,17 @@ const FileItem = ({ id, fromDirectory, icon, label, className, level }: IResourc
         }
       >
         <IconRenderer icon={icon} width={16} height={16} />
-        <h1 title={label} className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
+        {isNaming ? (
+          <input
+            ref={nameField}
+            type="text"
+            style={{ borderBottomColor: "gray" }}
+            className="relative w-[80%] text-left border-b-2 border-gray-600 bg-transparent outline-none"
+            onKeyDown={(e) => e.key === "Enter" && handleRenameItem(e.currentTarget.value)}
+          />
+        ) : (
+          <h1 title={label} className="relative w-[80%] text-left truncate text-ellipsis">{label}</h1>
+        )}
       </div>
 
       {menuPos && (

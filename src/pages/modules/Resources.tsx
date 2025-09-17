@@ -49,6 +49,7 @@ export const Resources = ({ resourcesItems }: { resourcesItems: IResourcesItem[]
           {resourcesItems.map((item, index) => (
             <ResourcesItem
               key={index}
+              id={item.id!}
               fromDirectory={item.fromDirectory}
               icon={item.icon}
               label={item.label}
