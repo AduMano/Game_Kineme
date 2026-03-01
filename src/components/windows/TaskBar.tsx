@@ -45,7 +45,7 @@ const Taskbar = () => {
 
   return (
     <>
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-neutral-900 border-t border-neutral-700 flex items-center px-2 gap-2 overflow-x-auto z-[9999] select-none">
+      <div className="absolute bottom-0 left-0 right-0 h-10 bg-c-darker border-t border-neutral-700 flex items-center px-2 gap-2 overflow-x-auto z-[9999] select-none">
         {windows.map((win) => {
           const isActive = activeWindowId === win.id && !win.isMinimized;
 

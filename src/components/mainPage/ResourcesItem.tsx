@@ -15,6 +15,7 @@ import {
   useWindowStore,
   type WindowType,
 } from "../../pages/modules/stores/useWindowStore";
+import cuid from "cuid";
 
 const FolderItem = ({
   id,
@@ -33,29 +34,83 @@ const FolderItem = ({
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [menuItems, setMenuItems] = useState<ContextMenuItem[]>([]);
   const nameField = useRef<HTMLInputElement>(null);
+
   const addItem = useResourcesStore((state) => state.addItem);
   const removeItem = useResourcesStore((state) => state.removeItem);
   const renameItem = useResourcesStore((state) => state.renameItem);
+  const editingItemId = useResourcesStore((state) => state.editingItemId);
+  const setEditingItemId = useResourcesStore((state) => state.setEditingItemId);
+
+  const updateWindowTitle = useWindowStore((state) => state.updateWindowTitle);
+  const closeWindow = useWindowStore((state) => state.closeWindow); // Added closeWindow for folders!
+
+  useEffect(() => {
+    if (editingItemId === id) {
+      setNamingState(true);
+      setEditingItemId(null);
+    }
+  }, [editingItemId, id, setEditingItemId]);
 
   const handleAddItem = (type: "Folder" | "File") => {
-    // Ask user first what to name, can be cancelled or confirm
     if (!isOpen) disclosureRef?.current?.click();
-    // Then Add
+
+    let baseName = label!;
+    if (level === 0 && label?.endsWith("s")) baseName = label.slice(0, -1);
+    const prefix = type === "Folder" ? `${baseName}Folder` : baseName;
+
+    const regex = new RegExp(`^${prefix}_(\\d{3})$`);
+    const existingNumbers = (subDirectory || [])
+      .map((item) => {
+        const match = item.label?.match(regex);
+        return match ? parseInt(match[1], 10) : null;
+      })
+      .filter((n) => n !== null) as number[];
+
+    let nextNum = 1;
+    while (existingNumbers.includes(nextNum)) nextNum++;
+    const newName = `${prefix}_${nextNum.toString().padStart(3, "0")}`;
+    const newId = cuid();
+
     addItem({
+      id: newId,
       isFolder: type === "Folder",
       directory: fromDirectory,
       level: level!,
-      name: "Testing LANG",
+      name: newName,
     });
+
+    setEditingItemId(newId);
   };
 
   const handleRemoveItem = () => {
-    // Ask user first if they really want to delete it
-    removeItem({
-      id: id!,
-      directory: fromDirectory,
-      level: level!,
-    });
+    if (
+      window.confirm(
+        `Are you sure you want to delete the folder "${label}" and all its contents?`,
+      )
+    ) {
+      // 1. Helper to gather all nested IDs inside this folder
+      const gatherIds = (subs: IResourcesItem[] | undefined): string[] => {
+        let ids: string[] = [];
+        if (!subs) return ids;
+        subs.forEach((s) => {
+          if (s.id) ids.push(s.id);
+          if (s.subDirectory) ids = ids.concat(gatherIds(s.subDirectory));
+        });
+        return ids;
+      };
+
+      const allIdsToClose = [id!, ...gatherIds(subDirectory)];
+
+      // 2. Remove the item from the file tree
+      removeItem({
+        id: id!,
+        directory: fromDirectory,
+        level: level!,
+      });
+
+      // 3. Force close every window associated with those deleted files
+      allIdsToClose.forEach((childId) => closeWindow(childId));
+    }
   };
 
   const handleRenameItem = (textValue: string) => {
@@ -75,9 +130,12 @@ const FolderItem = ({
         id,
         name,
       });
-
-      if (isRenamed) setNamingState(false);
-      else nameField!.current!.style.borderBottomColor = "red";
+      if (isRenamed) {
+        setNamingState(false);
+        updateWindowTitle(id!, name);
+      } else {
+        nameField!.current!.style.borderBottomColor = "red";
+      }
     }
   };
 
@@ -237,18 +295,33 @@ const FileItem = ({
   const [isNaming, setNamingState] = useState<boolean>(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [menuItems, setMenuItems] = useState<ContextMenuItem[]>([]);
+
   const renameItem = useResourcesStore((state) => state.renameItem);
   const removeItem = useResourcesStore((state) => state.removeItem);
+  const updateWindowTitle = useWindowStore((state) => state.updateWindowTitle);
+  const editingItemId = useResourcesStore((state) => state.editingItemId);
+  const setEditingItemId = useResourcesStore((state) => state.setEditingItemId);
 
-  // 1. Bring in the openWindow action
   const openWindow = useWindowStore((state) => state.openWindow);
+  const closeWindow = useWindowStore((state) => state.closeWindow);
+
+  useEffect(() => {
+    if (editingItemId === id) {
+      setNamingState(true);
+      setEditingItemId(null);
+    }
+  }, [editingItemId, id, setEditingItemId]);
 
   const handleRemoveItem = () => {
-    removeItem({
-      id: id!,
-      directory: fromDirectory,
-      level: level!,
-    });
+    if (window.confirm(`Are you sure you want to delete "${label}"?`)) {
+      removeItem({
+        id: id!,
+        directory: fromDirectory,
+        level: level!,
+      });
+
+      closeWindow(id!);
+    }
   };
 
   const handleRenameItem = (textValue: string) => {
@@ -268,13 +341,15 @@ const FileItem = ({
         id,
         name,
       });
-
-      if (isRenamed) setNamingState(false);
-      else nameField!.current!.style.borderBottomColor = "red";
+      if (isRenamed) {
+        setNamingState(false);
+        updateWindowTitle(id!, name);
+      } else {
+        nameField!.current!.style.borderBottomColor = "red";
+      }
     }
   };
 
-  // 2. Create the open window handler
   const handleOpenEditor = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
@@ -317,7 +392,6 @@ const FileItem = ({
     setMenuPos({ x: e.pageX, y: e.pageY });
 
     const baseItems = [
-      // 3. Replaced alert with actual open function
       {
         icon: <IconRenderer icon="MagnifyingGlass" width={16} height={16} />,
         label: "Open",
@@ -351,7 +425,7 @@ const FileItem = ({
       <div
         style={{ borderColor: level! > 0 ? `${currentColor}` : "" }}
         onContextMenu={(e) => handleContextMenu(e)}
-        onDoubleClick={handleOpenEditor} // 4. Bind the double click here
+        onDoubleClick={handleOpenEditor}
         className={`w-full px-4 py-2 relative flex items-center gap-x-4 ${className}
           hover:bg-c-darker hover:text-c-lighter hover:cursor-pointer
             select-none border-l-2`}

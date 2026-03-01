@@ -1,6 +1,7 @@
 import type { TIcon } from "./IconRendererTypes";
 
-export type TFromDirectory = "Sprites"
+export type TFromDirectory =
+  | "Sprites"
   | "Sounds"
   | "Scripts"
   | "Functions"
@@ -9,6 +10,7 @@ export type TFromDirectory = "Sprites"
 export interface IResourcesItem {
   parent?: IResourcesItem;
   id?: string;
+  data?: any;
   fromDirectory: TFromDirectory;
   label: string;
   icon: TIcon;

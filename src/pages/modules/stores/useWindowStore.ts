@@ -49,6 +49,7 @@ interface WindowState {
     id: string,
     size: { width: number; height: number },
   ) => void;
+  updateWindowTitle: (id: string, title: string) => void;
   toggleMaximizeWindow: (id: string) => void;
 
   registerInterceptors: (id: string, interceptors: WindowInterceptors) => void;
@@ -187,6 +188,13 @@ export const useWindowStore = create<WindowState>()(
       updateWindowSize: (id, size) =>
         set((state) => ({
           windows: state.windows.map((w) => (w.id === id ? { ...w, size } : w)),
+        })),
+
+      updateWindowTitle: (id, title) =>
+        set((state) => ({
+          windows: state.windows.map((w) =>
+            w.id === id ? { ...w, title } : w,
+          ),
         })),
 
       toggleMaximizeWindow: (id) =>

@@ -1,14 +1,24 @@
 import type { JSX } from "react";
 import type { IIConRenderer, TIcon } from "../types/IconRendererTypes";
 import {
-  ChevronDownIcon, ChevronRightIcon, CodeBracketSquareIcon, PhotoIcon, DocumentIcon,
-  DocumentCheckIcon, DocumentPlusIcon, FolderIcon, FolderOpenIcon, HomeIcon, PlayIcon,
-  SpeakerWaveIcon, CubeIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CodeBracketSquareIcon,
+  PhotoIcon,
+  DocumentIcon,
+  DocumentCheckIcon,
+  DocumentPlusIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  HomeIcon,
+  PlayIcon,
+  SpeakerWaveIcon,
+  CubeIcon,
   TrashIcon,
   PencilSquareIcon,
   DocumentMagnifyingGlassIcon,
   FolderArrowDownIcon,
-  CircleStackIcon
+  CircleStackIcon,
 } from "@heroicons/react/24/outline";
 
 export const IconRenderer = ({
@@ -16,7 +26,7 @@ export const IconRenderer = ({
   width = 24,
   height = 24,
 
-  className = ""
+  className = "",
 }: IIConRenderer) => {
   const Icons: Record<TIcon, JSX.Element> = {
     Folder: <FolderIcon width={width} height={height} />,
@@ -34,9 +44,12 @@ export const IconRenderer = ({
     NewFile: <DocumentPlusIcon width={width} height={height} />,
     Trash: <TrashIcon width={width} height={height} />,
     Pencil: <PencilSquareIcon width={width} height={height} />,
-    MagnifyingGlass: <DocumentMagnifyingGlassIcon width={width} height={height} />,
+    MagnifyingGlass: (
+      <DocumentMagnifyingGlassIcon width={width} height={height} />
+    ),
     FolderArrowDown: <FolderArrowDownIcon width={width} height={height} />,
     CircleStack: <CircleStackIcon width={width} height={height} />,
+    Alert: <DocumentIcon width={width} height={height} />,
   };
 
   return <div className={className}>{Icons[icon]}</div>;
