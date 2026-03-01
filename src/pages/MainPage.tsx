@@ -8,7 +8,7 @@ import { Toolbar } from "./modules/ToolBar";
 export const MainPage = () => {
   const toolbarItems: IToolbarItem[] = [
     { label: "New Project", icon: "NewFile" },
-    { label: "Open Project", icon: "OpenFolder" },
+    { label: "Load Project", icon: "OpenFolder" },
     { label: "Save Project", icon: "Save" },
     { label: "Run", icon: "Play", className: "ml-auto" },
   ];

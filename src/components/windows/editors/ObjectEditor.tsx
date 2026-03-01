@@ -119,6 +119,13 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
       visible: boolean; spriteId: string | null; destroy(): void;
     }
     declare const self: KinemeObject;
+    
+    // Tell Monaco about our Global Camera!
+    declare const Camera: {
+      x: number; y: number; width: number; height: number;
+      follow(instance: KinemeObject): void;
+    };
+
     ${userScripts}
   `;
 

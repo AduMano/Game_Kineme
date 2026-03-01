@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom"; // IMPORT THIS
 import { IconRenderer } from "./IconRenderer";
 
 interface ModalProps {
@@ -24,13 +25,13 @@ const Modal = ({
   onCancel,
   children,
 }: ModalProps) => {
-  if (!isOpen) return null;
-
   const [inputValue, setInputValue] = useState("");
 
-  return (
-    <div className="absolute inset-0 bg-black/60 z-[99999] flex items-center justify-center backdrop-blur-sm select-none">
-      {/* Uses your custom color classes! */}
+  if (!isOpen) return null;
+
+  // We wrap the entire return inside createPortal, attaching it directly to document.body
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center backdrop-blur-sm select-none">
       <div className="bg-c-darker text-c-lighter p-6 rounded shadow-2xl border border-neutral-700 max-w-sm w-full">
         <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
           {type === "confirm" && (
@@ -78,7 +79,8 @@ const Modal = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body, // <-- This tells React to render it at the root of the page!
   );
 };
 

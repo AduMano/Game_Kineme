@@ -1,5 +1,5 @@
-import { ToolbarItem } from "../../components/mainPage/ToolbarItem"
-import type { IToolbarItem } from "../../types/ToolbarItemTypes"
+import { ToolbarItem } from "../../components/mainPage/ToolbarItem";
+import type { IToolbarItem } from "../../types/ToolbarItemTypes";
 
 export const Toolbar = ({ toolbarItems }: { toolbarItems: IToolbarItem[] }) => {
   return (
@@ -9,11 +9,9 @@ export const Toolbar = ({ toolbarItems }: { toolbarItems: IToolbarItem[] }) => {
           key={index}
           icon={item.icon}
           label={item.label}
-          className={
-            `${item.className} ${(index === 0 || index === toolbarItems.length - 1) && "border-l-[1px]"}`
-          }
+          className={`${item.className} ${(index === 0 || index === toolbarItems.length - 1) && "border-l-[1px]"}`}
         />
       ))}
     </section>
-  )
-}
+  );
+};

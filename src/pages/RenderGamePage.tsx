@@ -1,5 +1,273 @@
+import { useEffect, useRef, useState } from "react";
+import { useResourcesStore } from "./modules/stores/useResourcesStore";
+import { loadFileFromDB } from "./modules/stores/utilities/indexedDB";
+
 export const RenderGamePage = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isRunning = true;
+    let animationFrameId: number;
+
+    const startEngine = async () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const resources = useResourcesStore.getState().resources;
+
+      const findItems = (type: string, arr: any[]): any[] => {
+        let result: any[] = [];
+        arr.forEach((item) => {
+          if (item.icon === type) result.push(item);
+          if (item.subDirectory)
+            result = result.concat(findItems(type, item.subDirectory));
+        });
+        return result;
+      };
+
+      // 1. INJECT GLOBAL SCRIPTS
+      const scripts = findItems("Script", resources);
+      let globalCode = "";
+      scripts.forEach((script) => {
+        if (script.data?.code)
+          globalCode += `\n/* --- ${script.label} --- */\n${script.data.code}\n`;
+      });
+
+      const scriptTag = document.createElement("script");
+      scriptTag.innerHTML = globalCode;
+      document.head.appendChild(scriptTag);
+
+      // 2. FIND DEFAULT ROOM
+      const rooms = findItems("Room", resources);
+      const defaultRoom =
+        rooms.find((r) => r.data?.roomProps?.isDefault) || rooms[0];
+      if (!defaultRoom) return setError("No Default Room found!");
+
+      const roomData = defaultRoom.data;
+      const roomProps = roomData.roomProps;
+      const camData = roomData.camera;
+
+      canvas.width = camData.width;
+      canvas.height = camData.height;
+
+      // Initialize Camera from Room Properties if window.Camera exists
+      if (window.Camera) {
+        window.Camera.x = camData.x;
+        window.Camera.y = camData.y;
+        window.Camera.width = camData.width;
+        window.Camera.height = camData.height;
+        window.Camera.roomWidth = roomProps.width;
+        window.Camera.roomHeight = roomProps.height;
+      }
+
+      // 3. PRE-LOAD ALL IMAGE ASSETS FROM INDEXEDDB
+      const imageCache: Record<string, HTMLImageElement> = {};
+      const loadPromises: Promise<void>[] = [];
+      const sprites = findItems("Image", resources);
+
+      sprites.forEach((sprite) => {
+        const assetId = sprite.data?.assetId;
+        if (assetId) {
+          const p = loadFileFromDB(assetId).then((blob) => {
+            if (blob) {
+              return new Promise<void>((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => {
+                  console.warn(`Failed to load image asset: ${assetId}`);
+                  resolve(); // Resolve anyway so the engine doesn't freeze!
+                };
+                img.src = URL.createObjectURL(blob);
+                imageCache[assetId] = img;
+              });
+            }
+          });
+          loadPromises.push(p);
+        }
+      });
+
+      await Promise.all(loadPromises);
+      if (!isRunning) return; // Prevent memory leak if user closed tab during load
+      setIsLoading(false);
+
+      // 4. INSTANTIATE OBJECTS AND COMPILE CODE
+      const objects = findItems("Object", resources);
+      const liveInstances: KinemeInstance[] = [];
+
+      roomData.layers.forEach((layer: any) => {
+        if (layer.type === "instances" && layer.visible) {
+          layer.instances.forEach((inst: any) => {
+            const baseObj = objects.find((o) => o.id === inst.objectId);
+            if (!baseObj) return;
+
+            const spriteResource = baseObj.data?.spriteId
+              ? sprites.find((s) => s.id === baseObj.data.spriteId)
+              : null;
+            const sprProps = spriteResource?.data?.spriteProps || null;
+            const assetId = spriteResource?.data?.assetId || null;
+
+            const liveObj = {
+              id: inst.id,
+              x: inst.x,
+              y: inst.y,
+              spriteProps: sprProps,
+              assetId: assetId,
+              visible: true,
+              _destroyed: false,
+              destroy: function () {
+                this._destroyed = true;
+              },
+            } as KinemeInstance;
+
+            try {
+              const onCreateFunc = new Function(
+                "self",
+                baseObj.data?.events?.onCreate || "",
+              );
+              const onStepFunc = new Function(
+                "self",
+                baseObj.data?.events?.onStep || "",
+              );
+
+              liveObj.onCreate = () => onCreateFunc(liveObj);
+              liveObj.onStep = () => onStepFunc(liveObj);
+
+              liveInstances.push(liveObj);
+            } catch (err) {
+              console.error(
+                `Compilation Error in Object ${baseObj.label}:`,
+                err,
+              );
+            }
+          });
+        }
+      });
+
+      // FIRE ALL ONCREATE EVENTS
+      liveInstances.forEach((inst) => {
+        if (inst.onCreate) inst.onCreate();
+      });
+
+      // 5. THE MASTER GAME LOOP
+      const gameLoop = (time: number) => {
+        if (!isRunning) return;
+
+        // --- UPDATE PHASE ---
+        if (window.Camera && window.Camera.update) window.Camera.update();
+
+        liveInstances.forEach((inst) => {
+          if (!inst._destroyed && inst.onStep) inst.onStep();
+        });
+
+        // --- DRAW PHASE ---
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+
+        // Handle Camera offset
+        const camX = window.Camera ? window.Camera.x : camData.x;
+        const camY = window.Camera ? window.Camera.y : camData.y;
+        ctx.translate(-camX, -camY);
+
+        // Draw Backgrounds
+        roomData.layers.forEach((layer: any) => {
+          if (
+            layer.type === "background" &&
+            layer.visible &&
+            layer.backgroundAssetId
+          ) {
+            const bgImg = imageCache[layer.backgroundAssetId];
+            if (bgImg) {
+              const px = camX * (layer.parallaxX || 1);
+              const py = camY * (layer.parallaxY || 1);
+              ctx.drawImage(bgImg, px, py);
+            }
+          }
+        });
+
+        // Draw Instances (WITH ANIMATION LOGIC)
+        liveInstances.forEach((inst) => {
+          if (inst._destroyed || !inst.visible || !inst.assetId) return;
+          const img = imageCache[inst.assetId];
+          const sp = inst.spriteProps;
+          if (!img || !sp) return;
+
+          const totalFrames = sp.rows * sp.cols;
+          let currentFrame = 0;
+
+          if (totalFrames > 1 && sp.fps > 0) {
+            const frameDuration = 1000 / sp.fps;
+            currentFrame = Math.floor(time / frameDuration) % totalFrames;
+          }
+
+          const col = currentFrame % sp.cols;
+          const row = Math.floor(currentFrame / sp.cols);
+
+          const sx = sp.offsetX + col * (sp.width + sp.gap);
+          const sy = sp.offsetY + row * (sp.height + sp.gap);
+
+          ctx.drawImage(
+            img,
+            sx,
+            sy,
+            sp.width,
+            sp.height,
+            inst.x - sp.originX,
+            inst.y - sp.originY,
+            sp.width,
+            sp.height,
+          );
+        });
+
+        ctx.restore();
+        animationFrameId = requestAnimationFrame(gameLoop);
+      };
+
+      animationFrameId = requestAnimationFrame(gameLoop);
+    };
+
+    startEngine();
+
+    return () => {
+      isRunning = false;
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  if (error) {
     return (
-        <div>RenderGamePage</div>
-    )
-}
+      <div className="w-screen h-screen bg-black text-red-500 flex items-center justify-center font-bold text-xl select-none">
+        Error: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-screen h-screen bg-black flex items-center justify-center overflow-hidden select-none relative">
+      {/* Loading Overlay is now separate from the canvas! */}
+      {isLoading && (
+        <div className="absolute inset-0 z-50 bg-black flex items-center justify-center text-white text-xl animate-pulse font-bold tracking-widest">
+          Compiling Game...
+        </div>
+      )}
+
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          imageRendering: "pixelated",
+          // Opacity transition makes it fade in beautifully when compiling finishes!
+          opacity: isLoading ? 0 : 1,
+          transition: "opacity 0.3s ease-in-out",
+        }}
+      />
+    </div>
+  );
+};

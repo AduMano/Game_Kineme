@@ -12,6 +12,7 @@ import {
 import { UTIL_SORT_SOURCES } from "./utilities/sortResources";
 import { InputManagerCode } from "../scripts/InputManager";
 import { CollisionManagerCode } from "../scripts/CollisionManager";
+import { CameraManagerCode } from "../scripts/CameraManager";
 
 interface ResourcesState {
   resources: IResourcesItem[];
@@ -69,8 +70,16 @@ export const useResourcesStore = create<ResourcesState>()(
               fromDirectory: "Scripts",
               label: "CollisionManager",
               icon: "Script",
-              level: 1,
+              level: 0,
               data: { code: CollisionManagerCode },
+            },
+            {
+              id: "builtin-script-camera",
+              fromDirectory: "Scripts",
+              label: "CameraManager",
+              icon: "Script",
+              level: 0,
+              data: { code: CameraManagerCode },
             },
           ],
           level: 0,
