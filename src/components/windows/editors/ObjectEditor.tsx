@@ -42,7 +42,7 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
 
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [showSpriteSelector, setShowSpriteSelector] = useState(false);
-  const [spriteSearch, setSpriteSearch] = useState(""); // NEW: Search state
+  const [spriteSearch, setSpriteSearch] = useState("");
   const confirmPromiseResolve = useRef<((value: boolean) => void) | null>(null);
 
   const savedData = (fileNode as any)?.data;
@@ -63,33 +63,9 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
 
   const [activeEvent, setActiveEvent] = useState<EventType>("onCreate");
 
-  // --- Helpers for Sprite Selector (Now with Folder Paths!) ---
   const spriteRoot = resources.find(
     (r) => r.fromDirectory === "Sprites" && r.level === 0,
   );
-
-  // --- Helpers for Script IntelliSense ---
-  const scriptRoot = resources.find(
-    (r) => r.fromDirectory === "Scripts" && r.level === 0,
-  );
-
-  const getAllScriptsCode = (items: any[]): string => {
-    let combinedCode = "";
-    items.forEach((item) => {
-      if (item.icon === "Script" && item.data?.code) {
-        combinedCode += `\n${item.data.code}\n`;
-      }
-      if (item.subDirectory) {
-        combinedCode += getAllScriptsCode(item.subDirectory);
-      }
-    });
-    return combinedCode;
-  };
-
-  const userScripts = scriptRoot?.subDirectory
-    ? getAllScriptsCode(scriptRoot.subDirectory)
-    : "";
-
   const getAllSprites = (
     items: any[],
     currentPath = "",
@@ -111,18 +87,41 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
   const availableSprites = spriteRoot?.subDirectory
     ? getAllSprites(spriteRoot.subDirectory)
     : [];
-
-  // Apply Search Filter
   const filteredSprites = availableSprites.filter(
     (s) =>
       s.label.toLowerCase().includes(spriteSearch.toLowerCase()) ||
       s.path.toLowerCase().includes(spriteSearch.toLowerCase()),
   );
-
   const selectedSpriteName =
     availableSprites.find((s) => s.id === spriteId)?.label || "No Sprite";
 
-  // --- Interceptor ---
+  const scriptRoot = resources.find(
+    (r) => r.fromDirectory === "Scripts" && r.level === 0,
+  );
+  const getAllScriptsCode = (items: any[]): string => {
+    let combinedCode = "";
+    items.forEach((item) => {
+      if (item.icon === "Script" && item.data?.code)
+        combinedCode += `\n${item.data.code}\n`;
+      if (item.subDirectory)
+        combinedCode += getAllScriptsCode(item.subDirectory);
+    });
+    return combinedCode;
+  };
+  const userScripts = scriptRoot?.subDirectory
+    ? getAllScriptsCode(scriptRoot.subDirectory)
+    : "";
+
+  const engineAPI = `
+    interface KinemeObject {
+      x: number; y: number; width: number; height: number;
+      scaleX: number; scaleY: number; alpha: number; angle: number;
+      visible: boolean; spriteId: string | null; destroy(): void;
+    }
+    declare const self: KinemeObject;
+    ${userScripts}
+  `;
+
   useEffect(() => {
     registerInterceptors(windowData.id, {
       onClose: () => {
@@ -135,10 +134,8 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
     });
   }, [hasChanges, windowData.id, registerInterceptors]);
 
-  // --- Save Logic ---
   const handleSave = () => {
     updateItemData(windowData.id, { spriteId, events });
-
     if (name !== windowData.title && windowData.data) {
       const isRenamed = renameItem({
         id: windowData.id,
@@ -158,45 +155,6 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
     setHasChanges(true);
   };
 
-  // --- The Engine IntelliSense API ---
-  const engineAPI = `
-    /**
-     * The built-in properties and methods for every Kineme Object.
-     */
-    interface KinemeObject {
-      /** The X coordinate of the object in the room */
-      x: number;
-      /** The Y coordinate of the object in the room */
-      y: number;
-      /** The width of the object's collision mask */
-      width: number;
-      /** The height of the object's collision mask */
-      height: number;
-      /** The horizontal scale of the sprite (1 = normal, -1 = flipped) */
-      scaleX: number;
-      /** The vertical scale of the sprite (1 = normal, -1 = flipped) */
-      scaleY: number;
-      /** The opacity of the object (0.0 to 1.0) */
-      alpha: number;
-      /** The current rotation angle in degrees */
-      angle: number;
-      /** If false, the object will not be drawn */
-      visible: boolean;
-      /** The ID of the currently assigned sprite */
-      spriteId: string | null;
-      
-      /** Destroys the object and removes it from the room */
-      destroy(): void;
-    }
-
-    /** * In the Kineme Engine, 'self' refers to the current object instance. 
-     */
-    declare const self: KinemeObject;
-
-    // --- User Defined Scripts ---
-    ${userScripts}
-  `;
-
   return (
     <div className="flex flex-col w-full h-full bg-c-light text-black text-sm select-none relative">
       <Modal
@@ -215,7 +173,6 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
         }}
       />
 
-      {/* UPDATED: Sprite Selector Modal with Search */}
       <Modal
         isOpen={showSpriteSelector}
         type="alert"
@@ -225,7 +182,6 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
         onCancel={() => setShowSpriteSelector(false)}
       >
         <div className="flex flex-col gap-2 mt-4 max-h-80 pr-2">
-          {/* Search Bar */}
           <div className="relative mb-2">
             <IconRenderer
               icon="MagnifyingGlass"
@@ -241,7 +197,6 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
               className="w-full bg-c-dark border border-neutral-600 rounded pl-9 pr-3 py-2 text-c-lighter outline-none focus:border-blue-500"
             />
           </div>
-
           <div className="overflow-y-auto flex flex-col gap-2 pr-2">
             {!spriteSearch && (
               <button
@@ -255,7 +210,6 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
                 (No Sprite)
               </button>
             )}
-
             {filteredSprites.map((sprite) => (
               <button
                 key={sprite.id}
@@ -277,17 +231,11 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
                 )}
               </button>
             ))}
-            {filteredSprites.length === 0 && (
-              <p className="text-neutral-400 text-sm italic py-4 text-center">
-                No sprites match your search.
-              </p>
-            )}
           </div>
         </div>
       </Modal>
 
-      {/* TOP MENU */}
-      <div className="flex items-center bg-c-lighter border-b border-c-darker px-2 py-1 gap-2 relative z-10 shrink-0">
+      <div className="flex items-center bg-c-lighter border-b border-c-darker px-2 py-1 gap-2 relative z-10 shrink-0 shadow-sm">
         <button
           onClick={(e) =>
             setMenuPos({
@@ -315,11 +263,18 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* LEFT PANEL */}
-        <div className="w-64 bg-c-lighter border-r border-c-darker flex flex-col shrink-0">
-          <div className="p-4 flex flex-col gap-4 border-b border-c-darker">
+        {/* MATCHING CARD STYLE PANEL */}
+        <div className="w-72 bg-neutral-200 border-r border-c-darker flex flex-col shrink-0 p-3 gap-3 z-10 overflow-y-auto custom-scrollbar">
+          <div className="bg-white rounded-md border border-neutral-300 shadow-sm p-3 flex flex-col gap-3 shrink-0">
+            <h3 className="font-bold text-c-dark tracking-wide uppercase text-xs flex items-center gap-2 border-b pb-1">
+              <IconRenderer icon="Object" width={14} height={14} /> Object
+              Properties
+            </h3>
+
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Object Name</label>
+              <label className="text-[10px] font-semibold text-neutral-600">
+                Object Name
+              </label>
               <input
                 type="text"
                 value={name}
@@ -327,19 +282,22 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
                   setName(e.target.value);
                   setHasChanges(true);
                 }}
-                className="border border-c-darker px-2 py-1 rounded outline-none focus:border-blue-500"
+                className="border border-neutral-300 bg-neutral-50 px-2 py-1.5 rounded outline-none focus:border-blue-500 transition-colors"
               />
             </div>
+
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Default Sprite</label>
+              <label className="text-[10px] font-semibold text-neutral-600">
+                Default Sprite
+              </label>
               <div
                 onClick={() => {
                   setSpriteSearch("");
                   setShowSpriteSelector(true);
                 }}
-                className="border border-c-darker bg-white px-2 py-2 rounded cursor-pointer hover:border-blue-500 flex items-center gap-2 shadow-sm"
+                className="border border-neutral-300 bg-neutral-50 px-2 py-2 rounded cursor-pointer hover:border-blue-500 flex items-center gap-2 transition-colors"
               >
-                <div className="w-8 h-8 bg-checkerboard border border-neutral-300 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 bg-checkerboard border border-neutral-300 flex items-center justify-center shrink-0 rounded-sm overflow-hidden">
                   {spriteId ? (
                     <IconRenderer
                       icon="Image"
@@ -351,39 +309,46 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
                     <span className="text-xs text-neutral-400">?</span>
                   )}
                 </div>
-                <span className="truncate text-sm font-medium">
+                <span className="truncate text-xs font-medium text-neutral-700">
                   {selectedSpriteName}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* EVENTS LIST */}
-          <div className="flex-1 flex flex-col overflow-y-auto">
-            <div className="px-4 py-2 text-xs font-bold text-neutral-500 bg-c-darker tracking-wider uppercase">
-              Events
+          <div className="bg-white rounded-md border border-neutral-300 shadow-sm flex flex-col flex-1 min-h-[200px] overflow-hidden">
+            <div className="p-3 border-b border-neutral-200 bg-neutral-50 shrink-0">
+              <h3 className="font-bold text-c-dark tracking-wide uppercase text-xs flex items-center gap-2">
+                <IconRenderer icon="Code" width={14} height={14} /> Events
+              </h3>
             </div>
-            {(["onCreate", "onStep", "onDestroy"] as EventType[]).map((evt) => (
-              <button
-                key={evt}
-                onClick={() => setActiveEvent(evt)}
-                className={`px-4 py-3 text-left border-b border-c-darker flex items-center justify-between transition ${activeEvent === evt ? "bg-blue-100 border-l-4 border-l-blue-600 text-blue-900 font-semibold" : "hover:bg-neutral-200"}`}
-              >
-                {evt}
-                <IconRenderer
-                  icon="Code"
-                  width={14}
-                  height={14}
-                  className={
-                    activeEvent === evt ? "text-blue-600" : "text-neutral-400"
-                  }
-                />
-              </button>
-            ))}
+
+            <div className="flex-1 overflow-y-auto flex flex-col">
+              {(["onCreate", "onStep", "onDestroy"] as EventType[]).map(
+                (evt) => (
+                  <button
+                    key={evt}
+                    onClick={() => setActiveEvent(evt)}
+                    className={`px-4 py-3 text-left border-b border-neutral-100 flex items-center justify-between transition text-xs ${activeEvent === evt ? "bg-blue-50 border-l-4 border-l-blue-600 text-blue-900 font-semibold" : "hover:bg-neutral-50 text-neutral-700 border-l-4 border-l-transparent"}`}
+                  >
+                    {evt}
+                    <IconRenderer
+                      icon="Code"
+                      width={14}
+                      height={14}
+                      className={
+                        activeEvent === evt
+                          ? "text-blue-600"
+                          : "text-neutral-400"
+                      }
+                    />
+                  </button>
+                ),
+              )}
+            </div>
           </div>
         </div>
 
-        {/* RIGHT PANEL: CODE EDITOR */}
         <div className="flex-1 flex flex-col bg-[#1e1e1e] min-w-0">
           <div className="bg-[#2d2d2d] text-gray-300 px-4 py-2 text-sm border-b border-black shadow-sm flex items-center gap-2 shrink-0">
             <IconRenderer
@@ -405,8 +370,7 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
         </div>
       </div>
 
-      {/* NEW: BOTTOM ACTIONS */}
-      <div className="bg-c-lighter border-t border-c-darker px-4 py-2 flex justify-end gap-2 shrink-0">
+      <div className="bg-c-lighter border-t border-c-darker px-4 py-2 flex justify-end gap-2 shrink-0 z-10">
         <button
           onClick={() => requestClose(windowData.id)}
           className="px-4 py-1.5 border border-c-darker rounded hover:bg-c-dark hover:text-c-lighter transition"

@@ -10,7 +10,9 @@ import BaseWindow from "./BaseWindow";
 import SpriteEditor from "./editors/SpriteEditor";
 import ObjectEditor from "./editors/ObjectEditor";
 import RoomEditor from "./editors/RoomEditor";
-// import RoomEditor from './editors/RoomEditor';
+import ScriptEditor from "./editors/ScriptEditor";
+import FunctionEditor from "./editors/FunctionEditor";
+import SoundEditor from "./editors/SoundEditor";
 
 // Define the props that every editor will receive
 export interface EditorComponentProps {
@@ -21,10 +23,10 @@ export interface EditorComponentProps {
 const EditorRegistry: Record<WindowType, React.FC<EditorComponentProps>> = {
   SPRITE_EDITOR: SpriteEditor,
   OBJECT_EDITOR: ObjectEditor,
-  ROOM_EDITOR: RoomEditor, // Replace with RoomEditor when ready
-  SCRIPT_EDITOR: () => <div>Script Editor Placeholder</div>,
-  FUNCTION_EDITOR: () => <div>Function Editor Placeholder</div>,
-  SOUND_EDITOR: () => <div>Sound Editor Placeholder</div>,
+  ROOM_EDITOR: RoomEditor,
+  SCRIPT_EDITOR: ScriptEditor,
+  FUNCTION_EDITOR: FunctionEditor,
+  SOUND_EDITOR: SoundEditor,
 };
 
 const WindowManager = () => {

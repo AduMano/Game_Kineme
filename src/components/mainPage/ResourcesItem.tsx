@@ -371,6 +371,9 @@ const FileItem = ({
       case "Functions":
         windowType = "FUNCTION_EDITOR";
         break;
+      case "Sounds":
+        windowType = "SOUND_EDITOR";
+        break;
       default:
         console.warn("Unknown resource type:", fromDirectory);
     }

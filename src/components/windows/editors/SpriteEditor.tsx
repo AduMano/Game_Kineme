@@ -11,7 +11,7 @@ import {
 import ContextMenu from "../../ContextMenu";
 import type { ContextMenuItem } from "../../../types/ContextMenuTypes";
 import { IconRenderer } from "../../IconRenderer";
-import Modal from "../../Modal"; // Import our new reusable modal
+import Modal from "../../Modal";
 
 const generateFileHash = async (file: Blob): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
@@ -28,7 +28,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
   const { requestClose, registerInterceptors, updateWindowTitle } =
     useWindowStore();
   const updateItemData = useResourcesStore((state) => state.updateItemData);
-  const renameItem = useResourcesStore((state) => state.renameItem); // Needed to save the file name
+  const renameItem = useResourcesStore((state) => state.renameItem);
 
   const fileNode = useResourcesStore((state) => {
     let found = null;
@@ -49,10 +49,10 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [assetId, setAssetId] = useState<string | null>(
     (fileNode as any)?.data?.assetId ?? null,
-  ); // Track the Asset ID specifically
+  );
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageBlob, setImageBlob] = useState<Blob | null>(null);
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 }); // Tracks natural image size for responsive SVG
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [menuPos, setMenuPos] = useState<{
     x: number;
     y: number;
@@ -108,7 +108,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
     });
   }, [hasChanges, windowData.id, registerInterceptors]);
 
-  // --- Safe Save Logic with Renaming ---
+  // --- Safe Save Logic ---
   const handleSave = async () => {
     let finalAssetId = assetId;
 
@@ -117,14 +117,12 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       await saveFileToDB(finalAssetId, imageBlob);
     }
 
-    // Save grid data
     updateItemData(windowData.id, {
       spriteProps: props,
       hasImage: !!imageBlob,
       assetId: finalAssetId,
     });
 
-    // Handle Name Syncing
     if (props.name !== windowData.title && windowData.data) {
       const isRenamed = renameItem({
         id: windowData.id,
@@ -136,7 +134,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       if (isRenamed) {
         updateWindowTitle(windowData.id, props.name);
       } else {
-        setProps((p) => ({ ...p, name: windowData.title })); // Revert local name if failed
+        setProps((p) => ({ ...p, name: windowData.title }));
       }
     }
 
@@ -195,7 +193,6 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
 
   return (
     <div className="flex flex-col w-full h-full bg-c-light text-black text-sm select-none relative">
-      {/* 1. REUSABLE MODAL IN ACTION */}
       <Modal
         isOpen={showConfirmClose}
         type="confirm"
@@ -221,7 +218,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       />
 
       {/* TOP MENU */}
-      <div className="flex items-center bg-c-lighter border-b border-c-darker px-2 py-1 gap-2 relative z-10">
+      <div className="flex items-center bg-c-lighter border-b border-c-darker px-2 py-1 gap-2 relative z-10 shadow-sm">
         <button
           onClick={(e) =>
             setMenuPos({
@@ -277,126 +274,161 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
         )}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* LEFT PANEL */}
-        <div className="w-64 bg-c-lighter border-r border-c-darker p-4 flex flex-col gap-4 overflow-y-auto">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold">Sprite Name</label>
-            <input
-              type="text"
-              name="name"
-              value={props.name}
-              onChange={handlePropChange}
-              className="border border-c-darker px-2 py-1 rounded outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* MATCHING CARD STYLE PANEL */}
+        <div className="w-72 bg-neutral-200 border-r border-c-darker flex flex-col shrink-0 p-3 gap-3 z-10 overflow-y-auto custom-scrollbar">
+          {/* Sprite Properties Card */}
+          <div className="bg-white rounded-md border border-neutral-300 shadow-sm p-3 flex flex-col gap-3 shrink-0">
+            <h3 className="font-bold text-c-dark tracking-wide uppercase text-xs flex items-center gap-2 border-b pb-1">
+              <IconRenderer icon="Image" width={14} height={14} /> Sprite
+              Properties
+            </h3>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Grid Offset X</label>
+              <label className="text-[10px] font-semibold text-neutral-600">
+                Sprite Name
+              </label>
               <input
-                type="number"
-                name="offsetX"
-                value={props.offsetX}
+                type="text"
+                name="name"
+                value={props.name}
                 onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Grid Offset Y</label>
-              <input
-                type="number"
-                name="offsetY"
-                value={props.offsetY}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Origin X</label>
-              <input
-                type="number"
-                name="originX"
-                value={props.originX}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Origin Y</label>
-              <input
-                type="number"
-                name="originY"
-                value={props.originY}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
+                className="border border-neutral-300 bg-neutral-50 px-2 py-1.5 rounded outline-none focus:border-blue-500 transition-colors text-xs"
               />
             </div>
           </div>
 
-          <hr className="border-c-darker" />
+          {/* Grid & Slicing Card */}
+          <div className="bg-white rounded-md border border-neutral-300 shadow-sm p-3 flex flex-col gap-3 shrink-0">
+            <h3 className="font-bold text-c-dark tracking-wide uppercase text-xs flex items-center gap-2 border-b pb-1">
+              Slicing & Grid
+            </h3>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Rows</label>
-              <input
-                type="number"
-                name="rows"
-                min={1}
-                value={props.rows}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Columns</label>
-              <input
-                type="number"
-                name="cols"
-                min={1}
-                value={props.cols}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Width</label>
-              <input
-                type="number"
-                name="width"
-                min={1}
-                value={props.width}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold">Height</label>
-              <input
-                type="number"
-                name="height"
-                min={1}
-                value={props.height}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1 col-span-2">
-              <label className="text-xs font-semibold">Gap (px)</label>
-              <input
-                type="number"
-                name="gap"
-                min={0}
-                value={props.gap}
-                onChange={handlePropChange}
-                className="border border-c-darker px-2 py-1 rounded outline-none"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Width
+                </label>
+                <input
+                  type="number"
+                  name="width"
+                  min={1}
+                  value={props.width}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Height
+                </label>
+                <input
+                  type="number"
+                  name="height"
+                  min={1}
+                  value={props.height}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Rows
+                </label>
+                <input
+                  type="number"
+                  name="rows"
+                  min={1}
+                  value={props.rows}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Cols
+                </label>
+                <input
+                  type="number"
+                  name="cols"
+                  min={1}
+                  value={props.cols}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 mt-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Offset X
+                </label>
+                <input
+                  type="number"
+                  name="offsetX"
+                  value={props.offsetX}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Offset Y
+                </label>
+                <input
+                  type="number"
+                  name="offsetY"
+                  value={props.offsetY}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 mt-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Origin X
+                </label>
+                <input
+                  type="number"
+                  name="originX"
+                  value={props.originX}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Origin Y
+                </label>
+                <input
+                  type="number"
+                  name="originY"
+                  value={props.originY}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 col-span-2 mt-1">
+                <label className="text-[10px] font-semibold text-neutral-600">
+                  Gap (px)
+                </label>
+                <input
+                  type="number"
+                  name="gap"
+                  min={0}
+                  value={props.gap}
+                  onChange={handlePropChange}
+                  className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none text-xs"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-1 mt-2">
-            <div className="flex justify-between items-end">
-              <label className="text-xs font-semibold">Preview</label>
+          {/* Animation Preview Card */}
+          <div className="bg-white rounded-md border border-neutral-300 shadow-sm p-3 flex flex-col gap-2 shrink-0">
+            <div className="flex justify-between items-center border-b pb-1">
+              <h3 className="font-bold text-c-dark tracking-wide uppercase text-xs">
+                Preview
+              </h3>
               <div className="flex items-center gap-1">
                 <input
                   type="number"
@@ -405,31 +437,33 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
                   max={60}
                   value={props.fps}
                   onChange={handlePropChange}
-                  className="border border-c-darker px-1 py-0.5 rounded w-12 text-xs"
+                  className="border border-neutral-300 bg-neutral-50 px-1 py-0.5 rounded w-10 text-[10px] outline-none"
                 />
-                <span className="text-xs">FPS</span>
+                <span className="text-[10px] text-neutral-600 font-semibold">
+                  FPS
+                </span>
               </div>
             </div>
-            <div className="h-48 bg-c-dark border border-c-darker rounded flex items-center justify-center overflow-hidden relative">
+
+            <div className="h-40 bg-neutral-100 border border-neutral-300 rounded flex items-center justify-center overflow-hidden relative shadow-inner mt-1">
               {imageSrc ? (
                 <div
                   className="rendering-pixelated scale-[2]"
                   style={getFrameStyle()}
                 />
               ) : (
-                <span className="text-c-lighter text-xs text-center px-4">
-                  Import an image to see animation
+                <span className="text-neutral-400 text-[10px] text-center px-4">
+                  Import image to preview
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* 3. FULLY RESPONSIVE WORKSPACE */}
+        {/* FULLY RESPONSIVE WORKSPACE */}
         <div className="flex-1 bg-c-dark flex items-center justify-center overflow-hidden relative p-4 bg-checkerboard">
           {imageSrc ? (
             <div className="relative w-full h-full flex items-center justify-center">
-              {/* object-contain forces the image to scale naturally without losing its aspect ratio */}
               <img
                 src={imageSrc}
                 alt="Sprite Sheet"
@@ -442,7 +476,6 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
                 className="absolute inset-0 w-full h-full object-contain rendering-pixelated"
               />
 
-              {/* The SVG viewBox dynamically matches the image's natural size, scaling the grid with it! */}
               {imageSize.width > 0 && (
                 <svg
                   className="absolute inset-0 w-full h-full pointer-events-none"
@@ -504,7 +537,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       </div>
 
       {/* BOTTOM ACTIONS */}
-      <div className="bg-c-lighter border-t border-c-darker px-4 py-2 flex justify-end gap-2">
+      <div className="bg-c-lighter border-t border-c-darker px-4 py-2 flex justify-end gap-2 shrink-0 z-10">
         <button
           onClick={() => requestClose(windowData.id)}
           className="px-4 py-1.5 border border-c-darker rounded hover:bg-c-dark hover:text-c-lighter transition"
