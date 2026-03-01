@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import {
+  getWindowPrefix,
   useWindowStore,
   type WindowNode,
 } from "../../pages/modules/stores/useWindowStore";
@@ -122,6 +123,7 @@ const BaseWindow = ({ windowData, children }: BaseWindowProps) => {
         onDoubleClick={() => requestMaximize(windowData.id)}
       >
         <span className="text-sm font-semibold truncate pointer-events-none">
+          {getWindowPrefix(windowData.type)}
           {windowData.title}
         </span>
 

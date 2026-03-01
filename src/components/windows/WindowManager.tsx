@@ -8,7 +8,8 @@ import BaseWindow from "./BaseWindow";
 
 // Import all your separated editors here
 import SpriteEditor from "./editors/SpriteEditor";
-// import ObjectEditor from './editors/ObjectEditor';
+import ObjectEditor from "./editors/ObjectEditor";
+import RoomEditor from "./editors/RoomEditor";
 // import RoomEditor from './editors/RoomEditor';
 
 // Define the props that every editor will receive
@@ -19,10 +20,11 @@ export interface EditorComponentProps {
 // The Registry: Map the string type to the actual React component
 const EditorRegistry: Record<WindowType, React.FC<EditorComponentProps>> = {
   SPRITE_EDITOR: SpriteEditor,
-  OBJECT_EDITOR: () => <div>Object Editor Placeholder</div>, // Replace with ObjectEditor when ready
-  ROOM_EDITOR: () => <div>Room Editor Placeholder</div>, // Replace with RoomEditor when ready
+  OBJECT_EDITOR: ObjectEditor,
+  ROOM_EDITOR: RoomEditor, // Replace with RoomEditor when ready
   SCRIPT_EDITOR: () => <div>Script Editor Placeholder</div>,
   FUNCTION_EDITOR: () => <div>Function Editor Placeholder</div>,
+  SOUND_EDITOR: () => <div>Sound Editor Placeholder</div>,
 };
 
 const WindowManager = () => {

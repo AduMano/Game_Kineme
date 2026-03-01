@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  getWindowPrefix,
   useWindowStore,
   type WindowNode,
 } from "../../pages/modules/stores/useWindowStore";
@@ -63,7 +64,10 @@ const Taskbar = () => {
                   : "bg-c-darker text-black border-neutral-600 hover:bg-neutral-700"
               }`}
             >
-              <span className="truncate">{win.title}</span>
+              <span className="truncate">
+                {getWindowPrefix(win.type)}
+                {win.title}
+              </span>
             </div>
           );
         })}

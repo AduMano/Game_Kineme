@@ -17,7 +17,9 @@ export type TIcon =
   | "MagnifyingGlass"
   | "CircleStack"
   | "FolderArrowDown"
-  | "Alert";
+  | "Alert"
+  | "Code"
+  | "Plus";
 
 export interface IIConRenderer {
   icon: TIcon;

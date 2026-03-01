@@ -6,7 +6,8 @@ export type WindowType =
   | "OBJECT_EDITOR"
   | "ROOM_EDITOR"
   | "SCRIPT_EDITOR"
-  | "FUNCTION_EDITOR";
+  | "FUNCTION_EDITOR"
+  | "SOUND_EDITOR";
 
 export interface WindowNode {
   id: string;
@@ -19,6 +20,25 @@ export interface WindowNode {
   zIndex: number;
   data?: any;
 }
+
+export const getWindowPrefix = (type: WindowType) => {
+  switch (type) {
+    case "SPRITE_EDITOR":
+      return "SPR: ";
+    case "OBJECT_EDITOR":
+      return "OBJ: ";
+    case "SOUND_EDITOR":
+      return "SND: ";
+    case "ROOM_EDITOR":
+      return "RM: ";
+    case "FUNCTION_EDITOR":
+      return "FN: ";
+    case "SCRIPT_EDITOR":
+      return "SCR: ";
+    default:
+      return "";
+  }
+};
 
 export interface WindowInterceptors {
   onClose?: () => boolean | Promise<boolean>;
@@ -116,7 +136,7 @@ export const useWindowStore = create<WindowState>()(
           const newWindow: WindowNode = {
             ...payload,
             isMinimized: false,
-            isMaximized: false,
+            isMaximized: true,
             position: {
               x: window.innerWidth / 2 - 300,
               y: window.innerHeight / 2 - 200,

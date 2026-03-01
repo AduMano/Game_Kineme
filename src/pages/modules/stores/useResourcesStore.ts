@@ -10,6 +10,8 @@ import {
   UTIL_RENAME_ITEM_BY_ID_PATH,
 } from "./utilities/mutateResources";
 import { UTIL_SORT_SOURCES } from "./utilities/sortResources";
+import { InputManagerCode } from "../scripts/InputManager";
+import { CollisionManagerCode } from "../scripts/CollisionManager";
 
 interface ResourcesState {
   resources: IResourcesItem[];
@@ -53,7 +55,24 @@ export const useResourcesStore = create<ResourcesState>()(
           fromDirectory: "Scripts",
           label: "Scripts",
           icon: "Folder",
-          subDirectory: [],
+          subDirectory: [
+            {
+              id: "builtin-script-input",
+              fromDirectory: "Scripts",
+              label: "InputManager",
+              icon: "Script",
+              level: 0,
+              data: { code: InputManagerCode },
+            },
+            {
+              id: "builtin-script-collision",
+              fromDirectory: "Scripts",
+              label: "CollisionManager",
+              icon: "Script",
+              level: 1,
+              data: { code: CollisionManagerCode },
+            },
+          ],
           level: 0,
         },
         {

@@ -11,6 +11,14 @@ import {
 import ContextMenu from "../../ContextMenu";
 import type { ContextMenuItem } from "../../../types/ContextMenuTypes";
 import { IconRenderer } from "../../IconRenderer";
+import Modal from "../../Modal"; // Import our new reusable modal
+
+const generateFileHash = async (file: Blob): Promise<string> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-1", arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+};
 
 interface EditorProps {
   windowData: WindowNode;
@@ -20,8 +28,8 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
   const { requestClose, registerInterceptors, updateWindowTitle } =
     useWindowStore();
   const updateItemData = useResourcesStore((state) => state.updateItemData);
+  const renameItem = useResourcesStore((state) => state.renameItem); // Needed to save the file name
 
-  // Find the actual file data from the resources tree to see if we have saved data
   const fileNode = useResourcesStore((state) => {
     let found = null;
     const search = (items: any[]) => {
@@ -39,8 +47,12 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
 
   // --- Local State ---
   const [hasChanges, setHasChanges] = useState(false);
+  const [assetId, setAssetId] = useState<string | null>(
+    (fileNode as any)?.data?.assetId ?? null,
+  ); // Track the Asset ID specifically
   const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [imageBlob, setImageBlob] = useState<Blob | null>(null); // Keep the raw blob for saving
+  const [imageBlob, setImageBlob] = useState<Blob | null>(null);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 }); // Tracks natural image size for responsive SVG
   const [menuPos, setMenuPos] = useState<{
     x: number;
     y: number;
@@ -52,7 +64,6 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const confirmPromiseResolve = useRef<((value: boolean) => void) | null>(null);
 
-  // Sprite Properties (Load from fileNode if it exists, otherwise default)
   const savedProps = (fileNode as any)?.data?.spriteProps;
   const [props, setProps] = useState({
     name: windowData.title,
@@ -68,55 +79,71 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
     fps: savedProps?.fps ?? 15,
   });
 
-  // --- 1. Load Data on Mount ---
   useEffect(() => {
     const loadData = async () => {
-      if ((fileNode as any)?.data?.hasImage) {
-        const blob = await loadFileFromDB(windowData.id);
+      const currentAssetId = (fileNode as any)?.data?.assetId;
+      if (currentAssetId) {
+        const blob = await loadFileFromDB(currentAssetId);
         if (blob) {
           setImageBlob(blob);
           setImageSrc(URL.createObjectURL(blob));
+          setAssetId(currentAssetId);
         }
       }
       setIsLoading(false);
     };
     loadData();
-  }, [windowData.id]);
+  }, [windowData.id, fileNode]);
 
-  // --- 2. Safe Close Interceptor with CUSTOM MODAL ---
   useEffect(() => {
     registerInterceptors(windowData.id, {
       onClose: () => {
-        if (!hasChanges && imageSrc) return true; // Safe to close if no changes
-        if (!hasChanges && !imageSrc) return true; // Safe to close if empty
+        if (!hasChanges) return true;
 
-        // Show our custom modal
         setShowConfirmClose(true);
-
-        // Return a promise that pauses the close operation!
         return new Promise<boolean>((resolve) => {
           confirmPromiseResolve.current = resolve;
         });
       },
     });
-  }, [hasChanges, imageSrc, windowData.id, registerInterceptors]);
+  }, [hasChanges, windowData.id, registerInterceptors]);
 
-  // --- 3. Save Logic ---
+  // --- Safe Save Logic with Renaming ---
   const handleSave = async () => {
+    let finalAssetId = assetId;
+
     if (imageBlob) {
-      await saveFileToDB(windowData.id, imageBlob); // Save heavy binary to IndexedDB
+      finalAssetId = await generateFileHash(imageBlob);
+      await saveFileToDB(finalAssetId, imageBlob);
     }
 
-    // Save lightweight properties to Zustand (localStorage)
+    // Save grid data
     updateItemData(windowData.id, {
       spriteProps: props,
       hasImage: !!imageBlob,
+      assetId: finalAssetId,
     });
 
+    // Handle Name Syncing
+    if (props.name !== windowData.title && windowData.data) {
+      const isRenamed = renameItem({
+        id: windowData.id,
+        directory: windowData.data.fromDirectory,
+        level: windowData.data.level,
+        name: props.name,
+      });
+
+      if (isRenamed) {
+        updateWindowTitle(windowData.id, props.name);
+      } else {
+        setProps((p) => ({ ...p, name: windowData.title })); // Revert local name if failed
+      }
+    }
+
+    setAssetId(finalAssetId);
     setHasChanges(false);
   };
 
-  // --- Actions ---
   const handlePropChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
     setProps((prev) => ({
@@ -124,10 +151,9 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       [name]: type === "number" ? Number(value) : value,
     }));
     setHasChanges(true);
-    if (name === "name") updateWindowTitle(windowData.id, value);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImageBlob(file);
@@ -136,7 +162,6 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
     }
   };
 
-  // --- Animation Loop ---
   useEffect(() => {
     if (!imageSrc || props.fps <= 0) return;
     const interval = setInterval(
@@ -163,53 +188,29 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
 
   if (isLoading)
     return (
-      <div className="w-full h-full flex items-center justify-center bg-neutral-100 text-black">
+      <div className="w-full h-full flex items-center justify-center bg-c-dark text-c-lighter">
         Loading...
       </div>
     );
 
   return (
-    <div className="flex flex-col w-full h-full bg-neutral-100 text-neutral-900 text-sm select-none relative">
-      {/* CUSTOM CONFIRMATION MODAL */}
-      {showConfirmClose && (
-        <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-neutral-800 text-white p-6 rounded shadow-2xl border border-neutral-600 max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <IconRenderer
-                icon="Alert"
-                width={20}
-                height={20}
-                className="text-yellow-500"
-              />
-              Unsaved Changes
-            </h3>
-            <p className="text-neutral-300 text-sm mb-6">
-              You have unsaved changes in this sprite. If you close now, those
-              changes will be lost.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowConfirmClose(false);
-                  confirmPromiseResolve.current?.(false);
-                }}
-                className="px-4 py-2 bg-neutral-600 hover:bg-neutral-500 rounded transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowConfirmClose(false);
-                  confirmPromiseResolve.current?.(true);
-                }}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded transition"
-              >
-                Discard Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="flex flex-col w-full h-full bg-c-light text-black text-sm select-none relative">
+      {/* 1. REUSABLE MODAL IN ACTION */}
+      <Modal
+        isOpen={showConfirmClose}
+        type="confirm"
+        title="Unsaved Changes"
+        message="You have unsaved changes in this sprite. If you close now, those changes will be lost."
+        confirmText="Discard Changes"
+        onCancel={() => {
+          setShowConfirmClose(false);
+          confirmPromiseResolve.current?.(false);
+        }}
+        onConfirm={() => {
+          setShowConfirmClose(false);
+          confirmPromiseResolve.current?.(true);
+        }}
+      />
 
       <input
         type="file"
@@ -220,7 +221,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       />
 
       {/* TOP MENU */}
-      <div className="flex items-center bg-neutral-200 border-b border-neutral-300 px-2 py-1 gap-2 relative z-10">
+      <div className="flex items-center bg-c-lighter border-b border-c-darker px-2 py-1 gap-2 relative z-10">
         <button
           onClick={(e) =>
             setMenuPos({
@@ -236,7 +237,7 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
               ],
             })
           }
-          className="px-2 py-1 hover:bg-neutral-300 rounded cursor-pointer"
+          className="px-2 py-1 hover:bg-c-dark hover:text-c-lighter rounded cursor-pointer transition"
         >
           File
         </button>
@@ -257,170 +258,145 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
                   onClick: () => {
                     setImageSrc(null);
                     setImageBlob(null);
+                    setImageSize({ width: 0, height: 0 });
                     setHasChanges(true);
                   },
                 },
               ],
             })
           }
-          className="px-2 py-1 hover:bg-neutral-300 rounded cursor-pointer"
+          className="px-2 py-1 hover:bg-c-dark hover:text-c-lighter rounded cursor-pointer transition"
         >
           Image
         </button>
 
         {hasChanges && (
-          <span className="ml-auto text-xs text-neutral-500 italic">
+          <span className="ml-auto text-xs text-red-600 font-semibold italic">
             * Unsaved changes
           </span>
         )}
       </div>
 
-      {/* Main Workspace Split */}
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT PANEL */}
-        <div className="w-64 bg-neutral-200 border-r border-neutral-300 p-4 flex flex-col gap-4 overflow-y-auto">
-          {/* ... (Keep ALL your existing input fields here perfectly intact: Name, Offset, Origin, Rows, Cols, etc) ... */}
-
+        <div className="w-64 bg-c-lighter border-r border-c-darker p-4 flex flex-col gap-4 overflow-y-auto">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-neutral-600">
-              Sprite Name
-            </label>
+            <label className="text-xs font-semibold">Sprite Name</label>
             <input
               type="text"
               name="name"
               value={props.name}
               onChange={handlePropChange}
-              className="border px-2 py-1 rounded outline-none focus:border-blue-500"
+              className="border border-c-darker px-2 py-1 rounded outline-none focus:border-blue-500"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Grid Offset X
-              </label>
+              <label className="text-xs font-semibold">Grid Offset X</label>
               <input
                 type="number"
                 name="offsetX"
                 value={props.offsetX}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Grid Offset Y
-              </label>
+              <label className="text-xs font-semibold">Grid Offset Y</label>
               <input
                 type="number"
                 name="offsetY"
                 value={props.offsetY}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Origin X
-              </label>
+              <label className="text-xs font-semibold">Origin X</label>
               <input
                 type="number"
                 name="originX"
                 value={props.originX}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Origin Y
-              </label>
+              <label className="text-xs font-semibold">Origin Y</label>
               <input
                 type="number"
                 name="originY"
                 value={props.originY}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
           </div>
 
-          <hr className="border-neutral-300" />
+          <hr className="border-c-darker" />
 
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Rows
-              </label>
+              <label className="text-xs font-semibold">Rows</label>
               <input
                 type="number"
                 name="rows"
                 min={1}
                 value={props.rows}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Columns
-              </label>
+              <label className="text-xs font-semibold">Columns</label>
               <input
                 type="number"
                 name="cols"
                 min={1}
                 value={props.cols}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Width
-              </label>
+              <label className="text-xs font-semibold">Width</label>
               <input
                 type="number"
                 name="width"
                 min={1}
                 value={props.width}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-neutral-600">
-                Height
-              </label>
+              <label className="text-xs font-semibold">Height</label>
               <input
                 type="number"
                 name="height"
                 min={1}
                 value={props.height}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
             <div className="flex flex-col gap-1 col-span-2">
-              <label className="text-xs font-semibold text-neutral-600">
-                Gap (px)
-              </label>
+              <label className="text-xs font-semibold">Gap (px)</label>
               <input
                 type="number"
                 name="gap"
                 min={0}
                 value={props.gap}
                 onChange={handlePropChange}
-                className="border px-2 py-1 rounded outline-none"
+                className="border border-c-darker px-2 py-1 rounded outline-none"
               />
             </div>
           </div>
 
-          {/* Animation Preview Area */}
           <div className="flex flex-col gap-1 mt-2">
             <div className="flex justify-between items-end">
-              <label className="text-xs font-semibold text-neutral-600">
-                Preview
-              </label>
+              <label className="text-xs font-semibold">Preview</label>
               <div className="flex items-center gap-1">
                 <input
                   type="number"
@@ -429,19 +405,19 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
                   max={60}
                   value={props.fps}
                   onChange={handlePropChange}
-                  className="border px-1 py-0.5 rounded w-12 text-xs"
+                  className="border border-c-darker px-1 py-0.5 rounded w-12 text-xs"
                 />
-                <span className="text-xs text-neutral-500">FPS</span>
+                <span className="text-xs">FPS</span>
               </div>
             </div>
-            <div className="h-48 bg-neutral-300 border border-neutral-400 rounded flex items-center justify-center overflow-hidden relative">
+            <div className="h-48 bg-c-dark border border-c-darker rounded flex items-center justify-center overflow-hidden relative">
               {imageSrc ? (
                 <div
                   className="rendering-pixelated scale-[2]"
                   style={getFrameStyle()}
                 />
               ) : (
-                <span className="text-neutral-500 text-xs text-center px-4">
+                <span className="text-c-lighter text-xs text-center px-4">
                   Import an image to see animation
                 </span>
               )}
@@ -449,62 +425,71 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
           </div>
         </div>
 
-        {/* RIGHT PANEL: WORKSPACE */}
-        <div className="flex-1 bg-neutral-400 flex items-center justify-center overflow-auto relative p-4">
+        {/* 3. FULLY RESPONSIVE WORKSPACE */}
+        <div className="flex-1 bg-c-dark flex items-center justify-center overflow-hidden relative p-4 bg-checkerboard">
           {imageSrc ? (
-            <div
-              className="relative shadow-md bg-checkerboard"
-              style={{ width: "fit-content", height: "fit-content" }}
-            >
+            <div className="relative w-full h-full flex items-center justify-center">
+              {/* object-contain forces the image to scale naturally without losing its aspect ratio */}
               <img
                 src={imageSrc}
                 alt="Sprite Sheet"
-                className="block rendering-pixelated"
-                style={{ minWidth: "100px", minHeight: "100px" }}
+                onLoad={(e) =>
+                  setImageSize({
+                    width: e.currentTarget.naturalWidth,
+                    height: e.currentTarget.naturalHeight,
+                  })
+                }
+                className="absolute inset-0 w-full h-full object-contain rendering-pixelated"
               />
 
-              <svg
-                className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {Array.from({ length: props.rows }).map((_, r) =>
-                  Array.from({ length: props.cols }).map((_, c) => {
-                    const cellX = props.offsetX + c * (props.width + props.gap);
-                    const cellY =
-                      props.offsetY + r * (props.height + props.gap);
-                    return (
-                      <g key={`cell-${r}-${c}`}>
-                        <rect
-                          x={cellX}
-                          y={cellY}
-                          width={props.width}
-                          height={props.height}
-                          fill="none"
-                          stroke="rgba(59, 130, 246, 0.8)"
-                          strokeWidth="1"
-                        />
-                        <g stroke="rgba(255, 0, 0, 0.7)" strokeWidth="1">
-                          <line
-                            x1={cellX + props.originX - 5}
-                            y1={cellY + props.originY}
-                            x2={cellX + props.originX + 5}
-                            y2={cellY + props.originY}
+              {/* The SVG viewBox dynamically matches the image's natural size, scaling the grid with it! */}
+              {imageSize.width > 0 && (
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {Array.from({ length: props.rows }).map((_, r) =>
+                    Array.from({ length: props.cols }).map((_, c) => {
+                      const cellX =
+                        props.offsetX + c * (props.width + props.gap);
+                      const cellY =
+                        props.offsetY + r * (props.height + props.gap);
+                      return (
+                        <g key={`cell-${r}-${c}`}>
+                          <rect
+                            x={cellX}
+                            y={cellY}
+                            width={props.width}
+                            height={props.height}
+                            fill="none"
+                            stroke="rgba(59, 130, 246, 0.8)"
+                            strokeWidth="1"
                           />
-                          <line
-                            x1={cellX + props.originX}
-                            y1={cellY + props.originY - 5}
-                            x2={cellX + props.originX}
-                            y2={cellY + props.originY + 5}
-                          />
+                          <g stroke="rgba(255, 0, 0, 0.7)" strokeWidth="1">
+                            <line
+                              x1={cellX + props.originX - 5}
+                              y1={cellY + props.originY}
+                              x2={cellX + props.originX + 5}
+                              y2={cellY + props.originY}
+                            />
+                            <line
+                              x1={cellX + props.originX}
+                              y1={cellY + props.originY - 5}
+                              x2={cellX + props.originX}
+                              y2={cellY + props.originY + 5}
+                            />
+                          </g>
                         </g>
-                      </g>
-                    );
-                  }),
-                )}
-              </svg>
+                      );
+                    }),
+                  )}
+                </svg>
+              )}
             </div>
           ) : (
-            <div className="text-neutral-600 flex flex-col items-center gap-2">
+            <div className="text-c-lighter flex flex-col items-center gap-2">
               <IconRenderer icon="Image" width={48} height={48} />
               <p>No sprite sheet loaded.</p>
               <button
@@ -519,10 +504,10 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
       </div>
 
       {/* BOTTOM ACTIONS */}
-      <div className="bg-neutral-200 border-t border-neutral-300 px-4 py-2 flex justify-end gap-2">
+      <div className="bg-c-lighter border-t border-c-darker px-4 py-2 flex justify-end gap-2">
         <button
           onClick={() => requestClose(windowData.id)}
-          className="px-4 py-1.5 border border-neutral-400 rounded hover:bg-neutral-300 transition"
+          className="px-4 py-1.5 border border-c-darker rounded hover:bg-c-dark hover:text-c-lighter transition"
         >
           Close
         </button>

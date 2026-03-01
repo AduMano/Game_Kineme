@@ -50,6 +50,8 @@ export const IconRenderer = ({
     FolderArrowDown: <FolderArrowDownIcon width={width} height={height} />,
     CircleStack: <CircleStackIcon width={width} height={height} />,
     Alert: <DocumentIcon width={width} height={height} />,
+    Code: <CodeBracketSquareIcon width={width} height={height} />,
+    Plus: <DocumentPlusIcon width={width} height={height} />,
   };
 
   return <div className={className}>{Icons[icon]}</div>;
