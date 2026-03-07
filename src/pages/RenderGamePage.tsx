@@ -31,15 +31,14 @@ export const RenderGamePage = () => {
 
       const scripts = findItems("Script", resources);
       const sprites = findItems("Image", resources);
-      let globalCode = "";
-
-      // 1.5 CREATE GLOBAL SPRITES DICTIONARY
+      let globalCode = ""; // 1.5 CREATE GLOBAL SPRITES DICTIONARY
       // This allows you to type this.spriteId = Sprites.PlayerRun
+
       globalCode += `window.Sprites = {\n`;
       sprites.forEach((s) => {
         // Strip spaces/symbols so it becomes a valid JavaScript property name
         const cleanName = s.label.replace(/[^a-zA-Z0-9]/g, "");
-        globalCode += `  "${cleanName}": "${s.id}",\n`;
+        globalCode += `  "${cleanName}": "${s.id}",\n`;
       });
       globalCode += `};\n`;
 
@@ -55,9 +54,8 @@ export const RenderGamePage = () => {
 
       const scriptTag = document.createElement("script");
       scriptTag.innerHTML = globalCode;
-      document.head.appendChild(scriptTag);
+      document.head.appendChild(scriptTag); // 2. FIND DEFAULT ROOM
 
-      // 2. FIND DEFAULT ROOM
       const rooms = findItems("Room", resources);
       const defaultRoom =
         rooms.find((r) => r.data?.roomProps?.isDefault) || rooms[0];
@@ -68,9 +66,8 @@ export const RenderGamePage = () => {
       const camData = roomData.camera;
 
       canvas.width = camData.width;
-      canvas.height = camData.height;
+      canvas.height = camData.height; // Initialize Camera from Room Properties if window.Camera exists
 
-      // Initialize Camera from Room Properties if window.Camera exists
       if (window.Camera) {
         window.Camera.x = camData.x;
         window.Camera.y = camData.y;
@@ -78,9 +75,8 @@ export const RenderGamePage = () => {
         window.Camera.height = camData.height;
         window.Camera.roomWidth = roomProps.width;
         window.Camera.roomHeight = roomProps.height;
-      }
+      } // 3. PRE-LOAD ALL IMAGE ASSETS FROM INDEXEDDB
 
-      // 3. PRE-LOAD ALL IMAGE ASSETS FROM INDEXEDDB
       const imageCache: Record<string, HTMLImageElement> = {};
       const loadPromises: Promise<void>[] = [];
 
@@ -107,9 +103,8 @@ export const RenderGamePage = () => {
 
       await Promise.all(loadPromises);
       if (!isRunning) return; // Prevent memory leak if user closed tab during load
-      setIsLoading(false);
+      setIsLoading(false); // 4. INSTANTIATE OBJECTS AND COMPILE CODE
 
-      // 4. INSTANTIATE OBJECTS AND COMPILE CODE
       const objects = findItems("Object", resources);
       const liveInstances: KinemeInstance[] = [];
 
@@ -156,9 +151,8 @@ export const RenderGamePage = () => {
               const onStepFunc = new Function(
                 "self",
                 baseObj.data?.events?.onStep || "",
-              );
+              ); // THIS IS THE MAGIC: Bind the function to 'this' AND pass it as 'self'
 
-              // THIS IS THE MAGIC: Bind the function to 'this' AND pass it as 'self'
               liveObj.onCreate = function () {
                 onCreateFunc.call(this, this);
               };
@@ -175,37 +169,30 @@ export const RenderGamePage = () => {
             }
           });
         }
-      });
+      }); // FIRE ALL ONCREATE EVENTS
 
-      // FIRE ALL ONCREATE EVENTS
       liveInstances.forEach((inst) => {
         if (inst.onCreate) inst.onCreate();
-      });
+      }); // 5. THE MASTER GAME LOOP
 
-      // 5. THE MASTER GAME LOOP
       const gameLoop = (time: number) => {
-        if (!isRunning) return;
+        if (!isRunning) return; // --- UPDATE PHASE ---
 
-        // --- UPDATE PHASE ---
         if (window.Camera && window.Camera.update) window.Camera.update();
 
         liveInstances.forEach((inst) => {
           if (!inst._destroyed && inst.onStep) inst.onStep();
-        });
+        }); // --- DRAW PHASE ---
 
-        // --- DRAW PHASE ---
         ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, canvas.width, canvas.height); // SAVE #1: Save the raw canvas state before moving the camera
 
-        // SAVE #1: Save the raw canvas state before moving the camera
-        ctx.save();
+        ctx.save(); // Handle Camera offset (Math.round prevents pixel jitter!)
 
-        // Handle Camera offset (Math.round prevents pixel jitter!)
         const camX = Math.round(window.Camera ? window.Camera.x : camData.x);
         const camY = Math.round(window.Camera ? window.Camera.y : camData.y);
-        ctx.translate(-camX, -camY);
+        ctx.translate(-camX, -camY); // Draw Backgrounds
 
-        // Draw Backgrounds
         roomData.layers.forEach((layer: any) => {
           if (layer.type === "background" && layer.visible) {
             const spriteNodeId =
@@ -233,9 +220,8 @@ export const RenderGamePage = () => {
               }
             }
           }
-        });
+        }); // Draw Instances (WITH ANIMATION LOGIC)
 
-        // Draw Instances (WITH ANIMATION LOGIC)
         liveInstances.forEach((inst) => {
           if (inst._destroyed || !inst.visible || !inst.assetId) return;
           const img = imageCache[inst.assetId];
@@ -254,20 +240,17 @@ export const RenderGamePage = () => {
           const row = Math.floor(currentFrame / sp.cols);
 
           const sx = sp.offsetX + col * (sp.width + sp.gap);
-          const sy = sp.offsetY + row * (sp.height + sp.gap);
+          const sy = sp.offsetY + row * (sp.height + sp.gap); // SAVE #2: Save camera state before moving object
 
-          // SAVE #2: Save camera state before moving object
-          ctx.save();
+          ctx.save(); // 1. Move the canvas origin to the object's exact x/y position
 
-          // 1. Move the canvas origin to the object's exact x/y position
           ctx.translate(inst.x, inst.y);
 
           if (inst.angle !== 0) ctx.rotate((inst.angle * Math.PI) / 180);
           if (inst.scaleX !== 1 || inst.scaleY !== 1)
             ctx.scale(inst.scaleX, inst.scaleY);
-          if (inst.alpha !== 1) ctx.globalAlpha = inst.alpha;
+          if (inst.alpha !== 1) ctx.globalAlpha = inst.alpha; // Now draw the image relative to the new origin (-originX and -originY)
 
-          // Now draw the image relative to the new origin (-originX and -originY)
           ctx.drawImage(
             img,
             sx,
@@ -278,8 +261,7 @@ export const RenderGamePage = () => {
             -sp.originY,
             sp.width,
             sp.height,
-          );
-          // RESTORE #2: Restore back to camera state
+          ); // RESTORE #2: Restore back to camera state
           ctx.restore();
         });
 
@@ -302,32 +284,32 @@ export const RenderGamePage = () => {
   if (error) {
     return (
       <div className="w-screen h-screen bg-black text-red-500 flex items-center justify-center font-bold text-xl select-none">
-        Error: {error}
+                Error: {error}     {" "}
       </div>
     );
   }
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center overflow-hidden select-none relative">
-      {/* Loading Overlay is now separate from the canvas! */}
+            {/* Loading Overlay is now separate from the canvas! */}     {" "}
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-black flex items-center justify-center text-white text-xl animate-pulse font-bold tracking-widest">
-          Compiling Game...
+                    Compiling Game...        {" "}
         </div>
       )}
-
+           {" "}
       <canvas
         ref={canvasRef}
         style={{
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          imageRendering: "pixelated",
-          // Opacity transition makes it fade in beautifully when compiling finishes!
+          imageRendering: "pixelated", // Opacity transition makes it fade in beautifully when compiling finishes!
           opacity: isLoading ? 0 : 1,
           transition: "opacity 0.3s ease-in-out",
         }}
       />
+         {" "}
     </div>
   );
 };
