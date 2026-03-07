@@ -128,37 +128,27 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
     interface KinemeObject {
         x: number; y: number; width: number; height: number;
         scaleX: number; scaleY: number; alpha: number; angle: number;
-        tint: string; visible: boolean; spriteId: string | null; destroy(): void;
-        animationSpeed: number;
+        tint: string; animationSpeed: number; visible: boolean; 
+        spriteId: string | null; destroy(): void;
     }
     
-    // 1. 'self.' Autocomplete
     declare const self: KinemeObject;
+    interface Window extends KinemeObject {}
     
-    // 2. 'this.' Autocomplete (Explicitly injecting properties into the global window)
-    interface Window {
-        x: number; y: number; width: number; height: number;
-        scaleX: number; scaleY: number; alpha: number; angle: number;
-        tint: string; visible: boolean; spriteId: string | null; destroy(): void;
-        animationSpeed: number;
-    }
-
-    // 3. Core Engine Managers
     declare const Input: {
         isKeyDown(key: string): boolean;
         isKeyPressed(key: string): boolean;
-        mouseX: number; mouseY: number;
-        isMouseDown: boolean; isMousePressed: boolean;
     };
 
     declare const Camera: {
         x: number; y: number; width: number; height: number;
         roomWidth: number; roomHeight: number;
         follow(instance: KinemeObject): void;
-        update(): void;
     };
 
-    // 4. Custom User Scripts
+    // NEW: Global Sprites Dictionary
+    declare const Sprites: Record<string, string>;
+
     ${userScripts}
   `;
 

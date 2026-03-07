@@ -25,10 +25,13 @@ declare global {
       isKeyDown: (code: string) => boolean;
       isKeyPressed: (code: string) => boolean;
     };
+    Sprites: Record<string, string>;
   }
 
   interface KinemeInstance {
     id: string;
+    layerId: string; // NEW: Tracks which layer this object belongs to
+    spriteId: string | null; // NEW: The current sprite being drawn
     x: number;
     y: number;
     width: number;

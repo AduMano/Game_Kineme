@@ -30,7 +30,18 @@ export const RenderGamePage = () => {
       };
 
       const scripts = findItems("Script", resources);
+      const sprites = findItems("Image", resources);
       let globalCode = "";
+
+      // 1.5 CREATE GLOBAL SPRITES DICTIONARY
+      // This allows you to type this.spriteId = Sprites.PlayerRun
+      globalCode += `window.Sprites = {\n`;
+      sprites.forEach((s) => {
+        // Strip spaces/symbols so it becomes a valid JavaScript property name
+        const cleanName = s.label.replace(/[^a-zA-Z0-9]/g, "");
+        globalCode += `  "${cleanName}": "${s.id}",\n`;
+      });
+      globalCode += `};\n`;
 
       scripts.forEach((script) => {
         if (script.data?.code) {
@@ -72,7 +83,6 @@ export const RenderGamePage = () => {
       // 3. PRE-LOAD ALL IMAGE ASSETS FROM INDEXEDDB
       const imageCache: Record<string, HTMLImageElement> = {};
       const loadPromises: Promise<void>[] = [];
-      const sprites = findItems("Image", resources);
 
       sprites.forEach((sprite) => {
         const assetId = sprite.data?.assetId;
@@ -117,6 +127,8 @@ export const RenderGamePage = () => {
 
             const liveObj = {
               id: inst.id,
+              layerId: layer.id, // Track layer for parallax ordering!
+              spriteId: baseObj.data?.spriteId || null, // Dynamic sprite tracking!
               x: inst.x,
               y: inst.y,
               width: sprProps?.width || 32,
@@ -195,16 +207,30 @@ export const RenderGamePage = () => {
 
         // Draw Backgrounds
         roomData.layers.forEach((layer: any) => {
-          if (
-            layer.type === "background" &&
-            layer.visible &&
-            layer.backgroundAssetId
-          ) {
-            const bgImg = imageCache[layer.backgroundAssetId];
-            if (bgImg) {
-              const px = camX * (layer.parallaxX || 1);
-              const py = camY * (layer.parallaxY || 1);
-              ctx.drawImage(bgImg, px, py);
+          if (layer.type === "background" && layer.visible) {
+            const spriteNodeId =
+              layer.backgroundAssetId ||
+              layer.spriteId ||
+              layer.backgroundSpriteId;
+
+            if (spriteNodeId) {
+              const spriteResource = sprites.find((s) => s.id === spriteNodeId);
+              const actualAssetId = spriteResource?.data?.assetId;
+
+              if (actualAssetId) {
+                const bgImg = imageCache[actualAssetId];
+
+                if (bgImg) {
+                  const px =
+                    camX *
+                    (layer.parallaxX !== undefined ? layer.parallaxX : 1);
+                  const py =
+                    camY *
+                    (layer.parallaxY !== undefined ? layer.parallaxY : 1);
+
+                  ctx.drawImage(bgImg, px, py);
+                }
+              }
             }
           }
         });
