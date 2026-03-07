@@ -29,12 +29,17 @@ export const RenderGamePage = () => {
         return result;
       };
 
-      // 1. INJECT GLOBAL SCRIPTS
       const scripts = findItems("Script", resources);
       let globalCode = "";
+
       scripts.forEach((script) => {
-        if (script.data?.code)
-          globalCode += `\n/* --- ${script.label} --- */\n${script.data.code}\n`;
+        if (script.data?.code) {
+          const pureCode = script.data.code
+            .replace(/^export\s+const\s+\w+\s+=\s+`/, "")
+            .replace(/`;\s*$/, "");
+
+          globalCode += `\n/* --- ${script.label} --- */\n${pureCode}\n`;
+        }
       });
 
       const scriptTag = document.createElement("script");

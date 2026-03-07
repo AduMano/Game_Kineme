@@ -2,7 +2,7 @@ export const InputManagerCode = `/**
  * Global Input Manager
  * Handles Keyboard and Mouse states.
  */
-const Input = {
+window.Input = {
   _keys: {},
   _keysPressed: {},
   mouseX: 0,

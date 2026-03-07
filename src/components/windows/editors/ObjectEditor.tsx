@@ -98,36 +98,42 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
   const scriptRoot = resources.find(
     (r) => r.fromDirectory === "Scripts" && r.level === 0,
   );
+
   const getAllScriptsCode = (items: any[]): string => {
     let combinedCode = "";
     items.forEach((item) => {
-      if (item.icon === "Script" && item.data?.code)
-        combinedCode += `\n${item.data.code}\n`;
-      if (item.subDirectory)
+      // If it's a script, extract and clean the code
+      if (item.icon === "Script" && item.data?.code) {
+        // Strips the 'export const Name = `' and '`;' wrappers
+        const cleanedCode = item.data.code
+          .replace(/^export\s+const\s+\w+\s+=\s+`/, "")
+          .replace(/`;\s*$/, "");
+
+        combinedCode += `\n/* --- ${item.label} --- */\n${cleanedCode}\n`;
+      }
+      // Deep search into sub-directories
+      if (item.subDirectory) {
         combinedCode += getAllScriptsCode(item.subDirectory);
+      }
     });
     return combinedCode;
   };
+
   const userScripts = scriptRoot?.subDirectory
     ? getAllScriptsCode(scriptRoot.subDirectory)
     : "";
 
+  // 3. Inject into the engine API
   const engineAPI = `
     interface KinemeObject {
-      x: number; y: number; width: number; height: number;
-      scaleX: number; scaleY: number; alpha: number; angle: number;
-      visible: boolean; spriteId: string | null; destroy(): void;
+        x: number; y: number; width: number; height: number;
+        scaleX: number; scaleY: number; alpha: number; angle: number;
+        visible: boolean; spriteId: string | null; destroy(): void;
     }
     declare const self: KinemeObject;
     
-    // Tell Monaco about our Global Camera!
-    declare const Camera: {
-      x: number; y: number; width: number; height: number;
-      follow(instance: KinemeObject): void;
-    };
-
-    ${userScripts}
-  `;
+    // Custom User Scripts (Intellisense for your new managers)
+    ${userScripts}`;
 
   useEffect(() => {
     registerInterceptors(windowData.id, {

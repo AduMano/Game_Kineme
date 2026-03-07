@@ -1,7 +1,7 @@
 export const CollisionManagerCode = `/**
  * Global Collision Manager
  */
-const Collision = {
+window.Collision = {
   /**
    * Simple Axis-Aligned Bounding Box (AABB) collision check.
    * @param {KinemeObject} obj1 - First object with x, y, width, height
