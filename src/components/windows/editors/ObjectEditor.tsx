@@ -128,12 +128,37 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
     interface KinemeObject {
         x: number; y: number; width: number; height: number;
         scaleX: number; scaleY: number; alpha: number; angle: number;
-        visible: boolean; spriteId: string | null; destroy(): void;
+        tint: string; visible: boolean; spriteId: string | null; destroy(): void;
     }
+    
+    // 1. 'self.' Autocomplete
     declare const self: KinemeObject;
     
-    // Custom User Scripts (Intellisense for your new managers)
-    ${userScripts}`;
+    // 2. 'this.' Autocomplete (Explicitly injecting properties into the global window)
+    interface Window {
+        x: number; y: number; width: number; height: number;
+        scaleX: number; scaleY: number; alpha: number; angle: number;
+        tint: string; visible: boolean; spriteId: string | null; destroy(): void;
+    }
+
+    // 3. Core Engine Managers
+    declare const Input: {
+        isKeyDown(key: string): boolean;
+        isKeyPressed(key: string): boolean;
+        mouseX: number; mouseY: number;
+        isMouseDown: boolean; isMousePressed: boolean;
+    };
+
+    declare const Camera: {
+        x: number; y: number; width: number; height: number;
+        roomWidth: number; roomHeight: number;
+        follow(instance: KinemeObject): void;
+        update(): void;
+    };
+
+    // 4. Custom User Scripts
+    ${userScripts}
+  `;
 
   useEffect(() => {
     registerInterceptors(windowData.id, {
@@ -167,6 +192,19 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
     setEvents((prev) => ({ ...prev, [activeEvent]: value }));
     setHasChanges(true);
   };
+
+  // Listen for the global "Save All" broadcast
+  useEffect(() => {
+    const handleGlobalSave = () => {
+      if (hasChanges) {
+        handleSave();
+      }
+    };
+
+    window.addEventListener("kineme-save-all", handleGlobalSave);
+    return () =>
+      window.removeEventListener("kineme-save-all", handleGlobalSave);
+  }, [hasChanges, handleSave]);
 
   return (
     <div className="flex flex-col w-full h-full bg-c-light text-black text-sm select-none relative">

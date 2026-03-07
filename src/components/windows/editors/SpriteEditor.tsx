@@ -184,6 +184,19 @@ const SpriteEditor = ({ windowData }: EditorProps) => {
     };
   };
 
+  // Listen for the global "Save All" broadcast
+  useEffect(() => {
+    const handleGlobalSave = () => {
+      if (hasChanges) {
+        handleSave();
+      }
+    };
+
+    window.addEventListener("kineme-save-all", handleGlobalSave);
+    return () =>
+      window.removeEventListener("kineme-save-all", handleGlobalSave);
+  }, [hasChanges, handleSave]);
+
   if (isLoading)
     return (
       <div className="w-full h-full flex items-center justify-center bg-c-dark text-c-lighter">

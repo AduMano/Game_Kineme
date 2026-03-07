@@ -264,6 +264,9 @@ export const ToolbarItem = ({
           if (label === "Load Project") handleLoadContextMenu(e);
           if (label === "New Project") executeWithDirtyCheck(createNewProject);
           if (label === "Run") window.open("/run", "_blank");
+          if (label === "Save All") {
+            window.dispatchEvent(new Event("kineme-save-all"));
+          }
         }}
         className={`flex items-center gap-2 py-2 px-4 text-black hover:text-c-lighter border-c-dark border-r-[1px] select-none active:bg-white active:text-c-darker bg-white hover:bg-c-darker hover:cursor-pointer transition-colors ${className}`}
       >

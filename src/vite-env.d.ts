@@ -1,32 +1,41 @@
 /// <reference types="vite/client" />
 
-// Tell TypeScript about our custom Kineme Engine global variables
-interface Window {
-  Camera: {
+export {};
+
+declare global {
+  interface Window {
+    Camera: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      roomWidth: number;
+      roomHeight: number;
+      target: any;
+      panDelay: number;
+      clampToRoom: boolean;
+      follow: (instance: any) => void;
+      update: () => void;
+    };
+  }
+
+  interface KinemeInstance {
+    id: string;
     x: number;
     y: number;
     width: number;
     height: number;
-    roomWidth: number;
-    roomHeight: number;
-    target: any;
-    panDelay: number;
-    clampToRoom: boolean;
-    follow: (instance: any) => void;
-    update: () => void;
-  };
-}
-
-// Add this interface to define what a "Live" object looks like in the runner
-interface KinemeInstance {
-  id: string;
-  x: number;
-  y: number;
-  spriteProps: any;
-  assetId: string | null;
-  visible: boolean;
-  _destroyed: boolean;
-  destroy: () => void;
-  onCreate?: () => void; // Optional because not all objects have code
-  onStep?: () => void; // Optional because not all objects have code
+    scaleX: number;
+    scaleY: number;
+    angle: number; // Rotation in degrees
+    alpha: number; // Opacity (0.0 to 1.0)
+    tint: string; // Hex color (e.g., "#ffffff") - for future implementation
+    spriteProps: any;
+    assetId: string | null;
+    visible: boolean;
+    _destroyed: boolean;
+    destroy: () => void;
+    onCreate?: () => void; // Optional because not all objects have code
+    onStep?: () => void; // Optional because not all objects have code
+  }
 }

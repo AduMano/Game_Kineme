@@ -1,4 +1,5 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
+import { useRef, useEffect } from "react";
 
 interface CodeEditorProps {
   code: string;
@@ -7,7 +8,12 @@ interface CodeEditorProps {
 }
 
 const CodeEditor = ({ code, onChange, customLib = "" }: CodeEditorProps) => {
-  const handleEditorWillMount = (monaco: Monaco) => {
+  const monacoRef = useRef<Monaco | null>(null);
+  const extraLibRef = useRef<any>(null);
+
+  const handleEditorDidMount = (editor: any, monaco: Monaco) => {
+    monacoRef.current = monaco;
+
     // 1. Configure the JavaScript environment
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: false,
@@ -21,12 +27,30 @@ const CodeEditor = ({ code, onChange, customLib = "" }: CodeEditorProps) => {
       allowJs: true,
     });
 
-    // 3. Inject our Game Engine API and User Scripts!
-    monaco.languages.typescript.javascriptDefaults.addExtraLib(
-      customLib,
-      "kineme-engine-api.d.ts",
-    );
+    // Force Monaco to sync models instantly when we add libraries
+    monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
+
+    // 3. Inject the Initial Game Engine API
+    extraLibRef.current =
+      monaco.languages.typescript.javascriptDefaults.addExtraLib(
+        customLib,
+        "kineme-engine-api.d.ts",
+      );
   };
+
+  // 4. DYNAMIC UPDATE: Whenever customLib changes
+  useEffect(() => {
+    if (monacoRef.current) {
+      if (extraLibRef.current) {
+        extraLibRef.current.dispose();
+      }
+      extraLibRef.current =
+        monacoRef.current.languages.typescript.javascriptDefaults.addExtraLib(
+          customLib,
+          "kineme-engine-api.d.ts",
+        );
+    }
+  }, [customLib]);
 
   return (
     <div className="w-full h-full bg-[#1e1e1e]">
@@ -36,7 +60,7 @@ const CodeEditor = ({ code, onChange, customLib = "" }: CodeEditorProps) => {
         theme="vs-dark"
         value={code}
         onChange={onChange}
-        beforeMount={handleEditorWillMount}
+        onMount={handleEditorDidMount} // Using onMount!
         options={{
           minimap: { enabled: false },
           fontSize: 14,

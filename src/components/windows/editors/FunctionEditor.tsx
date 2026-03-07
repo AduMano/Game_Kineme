@@ -79,6 +79,19 @@ const FunctionEditor = ({ windowData }: EditorProps) => {
     setHasChanges(true);
   };
 
+  // Listen for the global "Save All" broadcast
+  useEffect(() => {
+    const handleGlobalSave = () => {
+      if (hasChanges) {
+        handleSave();
+      }
+    };
+
+    window.addEventListener("kineme-save-all", handleGlobalSave);
+    return () =>
+      window.removeEventListener("kineme-save-all", handleGlobalSave);
+  }, [hasChanges, handleSave]);
+
   return (
     <div className="flex flex-col w-full h-full bg-c-light text-black text-sm select-none relative">
       <Modal

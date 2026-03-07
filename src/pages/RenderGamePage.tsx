@@ -119,6 +119,13 @@ export const RenderGamePage = () => {
               id: inst.id,
               x: inst.x,
               y: inst.y,
+              width: sprProps?.width || 32,
+              height: sprProps?.height || 32,
+              scaleX: 1,
+              scaleY: 1,
+              angle: 0,
+              alpha: 1,
+              tint: "#ffffff",
               spriteProps: sprProps,
               assetId: assetId,
               visible: true,
@@ -138,8 +145,13 @@ export const RenderGamePage = () => {
                 baseObj.data?.events?.onStep || "",
               );
 
-              liveObj.onCreate = () => onCreateFunc(liveObj);
-              liveObj.onStep = () => onStepFunc(liveObj);
+              // THIS IS THE MAGIC: Bind the function to 'this' AND pass it as 'self'
+              liveObj.onCreate = function () {
+                onCreateFunc.call(this, this);
+              };
+              liveObj.onStep = function () {
+                onStepFunc.call(this, this);
+              };
 
               liveInstances.push(liveObj);
             } catch (err) {
@@ -216,21 +228,38 @@ export const RenderGamePage = () => {
           const sx = sp.offsetX + col * (sp.width + sp.gap);
           const sy = sp.offsetY + row * (sp.height + sp.gap);
 
+          // NEW TRANSFORM LOGIC
+          ctx.save(); // Save the current canvas state (already translated for camera)
+
+          // 1. Move the canvas origin to the object's exact x/y position
+          ctx.translate(inst.x, inst.y);
+
+          // 2. Rotate the canvas (convert degrees to radians)
+          if (inst.angle !== 0) ctx.rotate((inst.angle * Math.PI) / 180);
+
+          // 3. Scale the canvas (for flipping or resizing)
+          if (inst.scaleX !== 1 || inst.scaleY !== 1)
+            ctx.scale(inst.scaleX, inst.scaleY);
+
+          // 4. Apply Alpha (opacity)
+          if (inst.alpha !== 1) ctx.globalAlpha = inst.alpha;
+
+          // Now draw the image relative to the new origin (-originX and -originY)
           ctx.drawImage(
             img,
             sx,
             sy,
             sp.width,
             sp.height,
-            inst.x - sp.originX,
-            inst.y - sp.originY,
+            -sp.originX,
+            -sp.originY,
             sp.width,
             sp.height,
           );
-        });
 
-        ctx.restore();
-        animationFrameId = requestAnimationFrame(gameLoop);
+          ctx.restore(); // Restore canvas back to normal for the next object
+          animationFrameId = requestAnimationFrame(gameLoop);
+        });
       };
 
       animationFrameId = requestAnimationFrame(gameLoop);
