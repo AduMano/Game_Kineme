@@ -125,6 +125,7 @@ export const RenderGamePage = () => {
               scaleY: 1,
               angle: 0,
               alpha: 1,
+              animationSpeed: 1,
               tint: "#ffffff",
               spriteProps: sprProps,
               assetId: assetId,
@@ -184,11 +185,12 @@ export const RenderGamePage = () => {
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // SAVE #1: Save the raw canvas state before moving the camera
         ctx.save();
 
-        // Handle Camera offset
-        const camX = window.Camera ? window.Camera.x : camData.x;
-        const camY = window.Camera ? window.Camera.y : camData.y;
+        // Handle Camera offset (Math.round prevents pixel jitter!)
+        const camX = Math.round(window.Camera ? window.Camera.x : camData.x);
+        const camY = Math.round(window.Camera ? window.Camera.y : camData.y);
         ctx.translate(-camX, -camY);
 
         // Draw Backgrounds
@@ -217,8 +219,8 @@ export const RenderGamePage = () => {
           const totalFrames = sp.rows * sp.cols;
           let currentFrame = 0;
 
-          if (totalFrames > 1 && sp.fps > 0) {
-            const frameDuration = 1000 / sp.fps;
+          if (totalFrames > 1 && sp.fps > 0 && inst.animationSpeed > 0) {
+            const frameDuration = 1000 / (sp.fps * inst.animationSpeed);
             currentFrame = Math.floor(time / frameDuration) % totalFrames;
           }
 
@@ -228,20 +230,15 @@ export const RenderGamePage = () => {
           const sx = sp.offsetX + col * (sp.width + sp.gap);
           const sy = sp.offsetY + row * (sp.height + sp.gap);
 
-          // NEW TRANSFORM LOGIC
-          ctx.save(); // Save the current canvas state (already translated for camera)
+          // SAVE #2: Save camera state before moving object
+          ctx.save();
 
           // 1. Move the canvas origin to the object's exact x/y position
           ctx.translate(inst.x, inst.y);
 
-          // 2. Rotate the canvas (convert degrees to radians)
           if (inst.angle !== 0) ctx.rotate((inst.angle * Math.PI) / 180);
-
-          // 3. Scale the canvas (for flipping or resizing)
           if (inst.scaleX !== 1 || inst.scaleY !== 1)
             ctx.scale(inst.scaleX, inst.scaleY);
-
-          // 4. Apply Alpha (opacity)
           if (inst.alpha !== 1) ctx.globalAlpha = inst.alpha;
 
           // Now draw the image relative to the new origin (-originX and -originY)
@@ -256,10 +253,13 @@ export const RenderGamePage = () => {
             sp.width,
             sp.height,
           );
-
-          ctx.restore(); // Restore canvas back to normal for the next object
-          animationFrameId = requestAnimationFrame(gameLoop);
+          // RESTORE #2: Restore back to camera state
+          ctx.restore();
         });
+
+        ctx.restore();
+        if (window.Input && window.Input.update) window.Input.update();
+        animationFrameId = requestAnimationFrame(gameLoop);
       };
 
       animationFrameId = requestAnimationFrame(gameLoop);

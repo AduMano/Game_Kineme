@@ -17,6 +17,14 @@ declare global {
       follow: (instance: any) => void;
       update: () => void;
     };
+    Input: {
+      keys: Record<string, boolean>;
+      keysPressed: Record<string, boolean>;
+      init: () => void;
+      update: () => void;
+      isKeyDown: (code: string) => boolean;
+      isKeyPressed: (code: string) => boolean;
+    };
   }
 
   interface KinemeInstance {
@@ -27,15 +35,16 @@ declare global {
     height: number;
     scaleX: number;
     scaleY: number;
-    angle: number; // Rotation in degrees
-    alpha: number; // Opacity (0.0 to 1.0)
-    tint: string; // Hex color (e.g., "#ffffff") - for future implementation
+    angle: number;
+    alpha: number;
+    tint: string;
+    animationSpeed: number; // NEW: Multiplier for sprite animation (1 = normal)
     spriteProps: any;
     assetId: string | null;
     visible: boolean;
     _destroyed: boolean;
     destroy: () => void;
-    onCreate?: () => void; // Optional because not all objects have code
-    onStep?: () => void; // Optional because not all objects have code
+    onCreate?: () => void;
+    onStep?: () => void;
   }
 }

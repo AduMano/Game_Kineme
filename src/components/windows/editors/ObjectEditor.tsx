@@ -129,6 +129,7 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
         x: number; y: number; width: number; height: number;
         scaleX: number; scaleY: number; alpha: number; angle: number;
         tint: string; visible: boolean; spriteId: string | null; destroy(): void;
+        animationSpeed: number;
     }
     
     // 1. 'self.' Autocomplete
@@ -139,6 +140,7 @@ const ObjectEditor = ({ windowData }: EditorProps) => {
         x: number; y: number; width: number; height: number;
         scaleX: number; scaleY: number; alpha: number; angle: number;
         tint: string; visible: boolean; spriteId: string | null; destroy(): void;
+        animationSpeed: number;
     }
 
     // 3. Core Engine Managers
