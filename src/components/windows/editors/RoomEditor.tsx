@@ -32,12 +32,20 @@ export interface RoomInstance {
   y: number;
 }
 
+export interface RoomAsset {
+  id: string;
+  spriteId: string;
+  x: number;
+  y: number;
+}
+
 export interface RoomLayer {
   id: string;
   name: string;
-  type: "instances" | "background";
+  type: "instances" | "background" | "decorator";
   visible: boolean;
   instances: RoomInstance[];
+  assets?: RoomAsset[];
   parallaxX: number;
   parallaxY: number;
   backgroundAssetId?: string | null;
@@ -106,8 +114,8 @@ const RoomEditor = ({ windowData }: EditorProps) => {
         type: "instances",
         visible: true,
         instances: [],
-        parallaxX: 1,
-        parallaxY: 1,
+        parallaxX: 0,
+        parallaxY: 0,
         isDeletable: false,
       },
       {
@@ -116,17 +124,17 @@ const RoomEditor = ({ windowData }: EditorProps) => {
         type: "background",
         visible: true,
         instances: [],
-        parallaxX: 0.5,
-        parallaxY: 0.5,
+        parallaxX: 1,
+        parallaxY: 1,
         isDeletable: false,
       },
     ],
   );
+
   const [activeLayerId, setActiveLayerId] = useState<string>(
     layers[0]?.id || "",
   );
   const activeLayer = layers.find((l) => l.id === activeLayerId);
-
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
   // --- Canvas State ---
@@ -137,6 +145,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
   const [draggingInst, setDraggingInst] = useState<{
     layerId: string;
     instId: string;
+    type: "instance" | "asset";
   } | null>(null);
   const isDraggingRef = useRef(false);
   const workspaceContainerRef = useRef<HTMLDivElement>(null);
@@ -168,7 +177,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
   const availableSprites = spriteRoot?.subDirectory
     ? getAllAssets(spriteRoot.subDirectory, "Image")
     : [];
-
   const [spriteCache, setSpriteCache] = useState<
     Record<string, SpriteDataCache>
   >({});
@@ -177,14 +185,11 @@ const RoomEditor = ({ windowData }: EditorProps) => {
     const loadObjectSprites = async () => {
       const newCache = { ...spriteCache };
       let hasNew = false;
-
-      // We load ALL available sprites AND object-assigned sprites into memory!
       const itemsToLoad = [...availableObjects, ...availableSprites];
 
       for (const obj of itemsToLoad) {
         if (newCache[obj.id] === undefined) {
           const objNode = findNode(resources, obj.id);
-          // If it's an object, get its spriteId. If it's ALREADY a sprite, use its own ID.
           const spriteId =
             objNode?.icon === "Image" ? obj.id : objNode?.data?.spriteId;
 
@@ -208,7 +213,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
       if (hasNew) setSpriteCache(newCache);
     };
     loadObjectSprites();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableObjects.length, availableSprites.length, resources]);
 
   const getCachedSprite = (objId: string | null) => {
@@ -223,7 +227,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
     };
   };
 
-  // --- Interceptors & Saving ---
   useEffect(() => {
     registerInterceptors(windowData.id, {
       onClose: () => {
@@ -269,18 +272,20 @@ const RoomEditor = ({ windowData }: EditorProps) => {
     setHasChanges(true);
   };
 
-  // --- LAYER MANAGEMENT LOGIC ---
-  const addLayer = (type: "instances" | "background") => {
+  // --- LAYER MANAGEMENT ---
+  const addLayer = (type: "instances" | "background" | "decorator") => {
     const newLayer: RoomLayer = {
       id: cuid(),
-      name: `New ${type === "instances" ? "Instances" : "Background"}`,
+      name: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
       type,
       visible: true,
       instances: [],
-      parallaxX: 1,
-      parallaxY: 1,
+      assets: type === "decorator" ? [] : undefined,
+      parallaxX: type === "background" ? 1 : 0,
+      parallaxY: type === "background" ? 1 : 0,
       isDeletable: true,
     };
+    // Always add new layers to the top of the UI list (index 0)
     setLayers([newLayer, ...layers]);
     setActiveLayerId(newLayer.id);
     setHasChanges(true);
@@ -291,11 +296,20 @@ const RoomEditor = ({ windowData }: EditorProps) => {
   };
 
   const moveLayer = (index: number, direction: -1 | 1) => {
-    if (index + direction < 0 || index + direction >= layers.length) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= layers.length) return;
+
+    // Lock the Background to the absolute bottom! No moving it, and no moving under it.
+    if (
+      layers[index].type === "background" ||
+      layers[targetIndex].type === "background"
+    )
+      return;
+
     const newLayers = [...layers];
     const temp = newLayers[index];
-    newLayers[index] = newLayers[index + direction];
-    newLayers[index + direction] = temp;
+    newLayers[index] = newLayers[targetIndex];
+    newLayers[targetIndex] = temp;
     setLayers(newLayers);
     setHasChanges(true);
   };
@@ -307,7 +321,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
     setHasChanges(true);
   };
 
-  // --- Canvas Interaction Logic ---
+  // --- CANVAS CONTROLS ---
   const handleWheel = (e: React.WheelEvent) => {
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     setZoom((prev) => Math.max(0.1, Math.min(5, prev * zoomFactor)));
@@ -320,14 +334,15 @@ const RoomEditor = ({ windowData }: EditorProps) => {
     }
   };
 
-  const handlePointerDownInstance = (
+  const handlePointerDownItem = (
     e: React.PointerEvent,
     layerId: string,
-    instId: string,
+    itemId: string,
+    itemType: "instance" | "asset",
   ) => {
     if (e.button === 0 && !e.altKey) {
       e.stopPropagation();
-      setDraggingInst({ layerId, instId });
+      setDraggingInst({ layerId, instId: itemId, type: itemType });
       isDraggingRef.current = false;
     }
   };
@@ -348,18 +363,28 @@ const RoomEditor = ({ windowData }: EditorProps) => {
     else if (draggingInst) {
       isDraggingRef.current = true;
       setLayers((prev) =>
-        prev.map((layer) =>
-          layer.id === draggingInst.layerId
-            ? {
-                ...layer,
-                instances: layer.instances.map((inst) =>
-                  inst.id === draggingInst.instId
-                    ? { ...inst, x: snappedX, y: snappedY }
-                    : inst,
-                ),
-              }
-            : layer,
-        ),
+        prev.map((layer) => {
+          if (layer.id !== draggingInst.layerId) return layer;
+          if (draggingInst.type === "instance") {
+            return {
+              ...layer,
+              instances: layer.instances.map((i) =>
+                i.id === draggingInst.instId
+                  ? { ...i, x: snappedX, y: snappedY }
+                  : i,
+              ),
+            };
+          } else {
+            return {
+              ...layer,
+              assets: layer.assets?.map((a) =>
+                a.id === draggingInst.instId
+                  ? { ...a, x: snappedX, y: snappedY }
+                  : a,
+              ),
+            };
+          }
+        }),
       );
     }
   };
@@ -380,66 +405,78 @@ const RoomEditor = ({ windowData }: EditorProps) => {
       !selectedObjectId
     )
       return;
-    if (
-      !activeLayer ||
-      activeLayer.type !== "instances" ||
-      !activeLayer.visible
-    )
-      return;
+    if (!activeLayer || !activeLayer.visible) return;
 
     setLayers((prev) =>
-      prev.map((layer) =>
-        layer.id === activeLayerId
-          ? {
-              ...layer,
-              instances: [
-                ...layer.instances,
-                {
-                  id: cuid(),
-                  objectId: selectedObjectId,
-                  x: mousePos.x,
-                  y: mousePos.y,
-                },
-              ],
-            }
-          : layer,
-      ),
+      prev.map((layer) => {
+        if (layer.id !== activeLayerId) return layer;
+
+        if (layer.type === "instances") {
+          return {
+            ...layer,
+            instances: [
+              ...layer.instances,
+              {
+                id: cuid(),
+                objectId: selectedObjectId,
+                x: mousePos.x,
+                y: mousePos.y,
+              },
+            ],
+          };
+        } else if (layer.type === "decorator") {
+          return {
+            ...layer,
+            assets: [
+              ...(layer.assets || []),
+              {
+                id: cuid(),
+                spriteId: selectedObjectId,
+                x: mousePos.x,
+                y: mousePos.y,
+              },
+            ],
+          };
+        }
+        return layer;
+      }),
     );
     setHasChanges(true);
   };
 
-  const handleRemoveInstance = (
+  const handleRemoveItem = (
     e: React.MouseEvent,
     layerId: string,
-    instanceId: string,
+    itemId: string,
+    type: "instance" | "asset",
   ) => {
     e.stopPropagation();
     e.preventDefault();
     setLayers((prev) =>
-      prev.map((layer) =>
-        layer.id === layerId
-          ? {
-              ...layer,
-              instances: layer.instances.filter(
-                (inst) => inst.id !== instanceId,
-              ),
-            }
-          : layer,
-      ),
+      prev.map((layer) => {
+        if (layer.id !== layerId) return layer;
+        return {
+          ...layer,
+          instances:
+            type === "instance"
+              ? layer.instances.filter((i) => i.id !== itemId)
+              : layer.instances,
+          assets:
+            type === "asset"
+              ? layer.assets?.filter((a) => a.id !== itemId)
+              : layer.assets,
+        };
+      }),
     );
     setHasChanges(true);
   };
 
   const ghostSprite = getCachedSprite(selectedObjectId);
 
-  // Listen for the global "Save All" broadcast
   useEffect(() => {
     const handleGlobalSave = () => {
-      if (hasChanges) {
-        handleSave();
-      }
+      if (hasChanges) handleSave();
     };
-
     window.addEventListener("kineme-save-all", handleGlobalSave);
     return () =>
       window.removeEventListener("kineme-save-all", handleGlobalSave);
@@ -462,7 +499,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
           confirmPromiseResolve.current?.(true);
         }}
       />
-
       <Modal
         isOpen={!!layerToDelete}
         type="confirm"
@@ -530,7 +566,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                   setName(e.target.value);
                   setHasChanges(true);
                 }}
-                className="border border-neutral-300 bg-neutral-50 px-2 py-1.5 rounded outline-none focus:border-blue-500 transition-colors"
+                className="border border-neutral-300 bg-neutral-50 px-2 py-1.5 rounded outline-none"
               />
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -570,22 +606,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                   className="border border-neutral-300 bg-neutral-50 px-2 py-1 rounded outline-none"
                 />
               </div>
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="checkbox"
-                id={`default-${windowData.id}`}
-                name="isDefault"
-                checked={roomProps.isDefault}
-                onChange={handlePropChange}
-                className="cursor-pointer"
-              />
-              <label
-                htmlFor={`default-${windowData.id}`}
-                className="text-xs font-semibold text-neutral-700 cursor-pointer"
-              >
-                Set as Default Start Room
-              </label>
             </div>
           </div>
 
@@ -686,14 +706,21 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                 <button
                   onClick={() => addLayer("instances")}
                   className="text-blue-600 hover:text-blue-800"
-                  title="Add Instances Layer"
+                  title="Add Instances"
                 >
                   <IconRenderer icon="Object" width={14} height={14} />
                 </button>
                 <button
+                  onClick={() => addLayer("decorator")}
+                  className="text-purple-600 hover:text-purple-800"
+                  title="Add Decorator"
+                >
+                  <IconRenderer icon="Image" width={14} height={14} />
+                </button>
+                <button
                   onClick={() => addLayer("background")}
                   className="text-green-600 hover:text-green-800"
-                  title="Add Background Layer"
+                  title="Add Background"
                 >
                   <IconRenderer icon="Image" width={14} height={14} />
                 </button>
@@ -723,7 +750,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                         e.stopPropagation();
                         moveLayer(index, -1);
                       }}
-                      disabled={index === 0}
+                      disabled={index === 0 || layer.type === "background"}
                       className="disabled:opacity-30"
                     >
                       <IconRenderer
@@ -738,7 +765,10 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                         e.stopPropagation();
                         moveLayer(index, 1);
                       }}
-                      disabled={index === layers.length - 1}
+                      disabled={
+                        index === layers.length - 1 ||
+                        layer.type === "background"
+                      }
                       className="disabled:opacity-30"
                     >
                       <IconRenderer icon="ChevronDown" width={12} height={12} />
@@ -750,11 +780,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                       }}
                       disabled={layer.isDeletable === false}
                       className={`ml-1 ${layer.isDeletable === false ? "opacity-20 cursor-not-allowed" : "text-red-400 hover:text-red-600"}`}
-                      title={
-                        layer.isDeletable === false
-                          ? "Default layer cannot be deleted"
-                          : "Delete Layer"
-                      }
                     >
                       <IconRenderer icon="Trash" width={12} height={12} />
                     </button>
@@ -764,21 +789,8 @@ const RoomEditor = ({ windowData }: EditorProps) => {
             </div>
 
             {/* LAYER PROPERTIES */}
-            {activeLayer && (
+            {activeLayer && activeLayer.type !== "instances" && (
               <div className="mt-2 bg-neutral-100 p-2 border border-neutral-300 rounded flex flex-col gap-2">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold text-neutral-600">
-                    Layer Name
-                  </label>
-                  <input
-                    type="text"
-                    value={activeLayer.name}
-                    onChange={(e) =>
-                      updateActiveLayer({ name: e.target.value })
-                    }
-                    className="border border-neutral-300 bg-white px-2 py-1 rounded outline-none text-xs"
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-semibold text-neutral-600">
@@ -813,18 +825,13 @@ const RoomEditor = ({ windowData }: EditorProps) => {
             )}
           </div>
 
-          {/* DYNAMIC ASSET BROWSER CARD (OBJECTS OR SPRITES) */}
+          {/* ASSET BROWSER */}
           <div className="bg-white rounded-md border border-neutral-300 shadow-sm p-3 flex flex-col gap-2 flex-1 min-h-[200px]">
             <h3 className="font-bold text-c-dark tracking-wide uppercase text-xs border-b pb-1">
               {activeLayer?.type === "instances"
                 ? "Available Objects"
                 : "Available Sprites"}
             </h3>
-            <p className="text-[10px] text-neutral-500 leading-tight">
-              {activeLayer?.type === "instances"
-                ? "Select to paint instances on grid."
-                : "Select to assign background to layer."}
-            </p>
             <div className="flex-1 overflow-y-auto bg-neutral-50 border border-neutral-200 rounded p-1 flex flex-col gap-1">
               {activeLayer?.type === "instances" &&
                 availableObjects.map((obj) => (
@@ -842,49 +849,47 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                           ? "text-blue-600"
                           : "text-neutral-500"
                       }
-                    />
+                    />{" "}
                     {obj.label}
                   </button>
                 ))}
 
-              {activeLayer?.type === "background" && (
+              {(activeLayer?.type === "background" ||
+                activeLayer?.type === "decorator") && (
                 <>
-                  <button
-                    onClick={() =>
-                      updateActiveLayer({ backgroundAssetId: null })
-                    }
-                    className={`text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 truncate ${!activeLayer.backgroundAssetId ? "bg-blue-100 text-blue-900 font-semibold" : "hover:bg-neutral-200"}`}
-                  >
-                    <IconRenderer
-                      icon="Image"
-                      width={14}
-                      height={14}
-                      className={
-                        !activeLayer.backgroundAssetId
-                          ? "text-blue-600"
-                          : "text-neutral-500"
+                  {activeLayer.type === "background" && (
+                    <button
+                      onClick={() =>
+                        updateActiveLayer({ backgroundAssetId: null })
                       }
-                    />
-                    (No Background)
-                  </button>
+                      className={`text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 truncate ${!activeLayer.backgroundAssetId ? "bg-blue-100 text-blue-900 font-semibold" : "hover:bg-neutral-200"}`}
+                    >
+                      <IconRenderer icon="Image" width={14} height={14} /> (No
+                      Background)
+                    </button>
+                  )}
                   {availableSprites.map((spr) => (
                     <button
                       key={spr.id}
-                      onClick={() =>
-                        updateActiveLayer({ backgroundAssetId: spr.id })
-                      }
-                      className={`text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 truncate ${activeLayer.backgroundAssetId === spr.id ? "bg-blue-100 text-blue-900 font-semibold" : "hover:bg-neutral-200"}`}
+                      onClick={() => {
+                        activeLayer.type === "background"
+                          ? updateActiveLayer({ backgroundAssetId: spr.id })
+                          : setSelectedObjectId(spr.id);
+                      }}
+                      className={`text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 truncate ${activeLayer.backgroundAssetId === spr.id || (activeLayer.type === "decorator" && selectedObjectId === spr.id) ? "bg-blue-100 text-blue-900 font-semibold" : "hover:bg-neutral-200"}`}
                     >
                       <IconRenderer
                         icon="Image"
                         width={14}
                         height={14}
                         className={
-                          activeLayer.backgroundAssetId === spr.id
+                          activeLayer.backgroundAssetId === spr.id ||
+                          (activeLayer.type === "decorator" &&
+                            selectedObjectId === spr.id)
                             ? "text-blue-600"
                             : "text-neutral-500"
                         }
-                      />
+                      />{" "}
                       {spr.label}
                     </button>
                   ))}
@@ -894,7 +899,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
           </div>
         </div>
 
-        {/* RIGHT PANEL: INTERACTIVE CANVAS */}
+        {/* CANVAS */}
         <div
           ref={workspaceContainerRef}
           className="flex-1 bg-c-dark overflow-hidden relative bg-checkerboard cursor-crosshair"
@@ -905,17 +910,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
           onPointerLeave={handlePointerUp}
           onContextMenu={(e) => e.preventDefault()}
         >
-          {/* Controls Hint */}
-          <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-3 py-2 rounded pointer-events-none z-50">
-            <p>
-              <strong>Pan Workspace:</strong> Middle Mouse / Alt+Click
-            </p>
-            <p>
-              <strong>Zoom:</strong> Scroll Wheel ({(zoom * 100).toFixed(0)}%)
-            </p>
-          </div>
-
-          {/* The Transform Container */}
           <div
             className="absolute top-0 left-0 origin-top-left"
             style={{
@@ -924,7 +918,6 @@ const RoomEditor = ({ windowData }: EditorProps) => {
               height: `${roomProps.height}px`,
             }}
           >
-            {/* Background / Grid */}
             <div
               className="absolute inset-0 bg-[#2a2a2a] shadow-2xl"
               style={{
@@ -933,9 +926,8 @@ const RoomEditor = ({ windowData }: EditorProps) => {
               }}
               onClick={handleCanvasClick}
             />
-            <div className="absolute inset-0 border-2 border-blue-500/50 pointer-events-none" />
 
-            {/* RENDER LAYERS */}
+            {/* RENDER LAYERS (Reversed so Top UI list item renders Last/On Top, Opacity removed so it's accurate!) */}
             {[...layers]
               .reverse()
               .filter((l) => l.visible)
@@ -944,13 +936,11 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                   layer.type === "background"
                     ? getCachedSprite(layer.backgroundAssetId || null)
                     : null;
-
                 return (
                   <div
                     key={layer.id}
-                    className={`absolute inset-0 pointer-events-none ${layer.id !== activeLayerId ? "opacity-70" : ""}`}
+                    className={`absolute inset-0 pointer-events-none`}
                   >
-                    {/* Background Layer Rendering */}
                     {layer.type === "background" && bgCache?.url && (
                       <div
                         className="absolute inset-0 rendering-pixelated"
@@ -961,24 +951,64 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                       />
                     )}
 
-                    {/* Instances Rendering */}
-                    {layer.instances.map((inst) => {
-                      const objLabel =
-                        availableObjects.find((o) => o.id === inst.objectId)
-                          ?.label || "Unknown";
-                      const cache = getCachedSprite(inst.objectId);
+                    {layer.type === "decorator" &&
+                      layer.assets?.map((asset) => {
+                        const cache = getCachedSprite(asset.spriteId);
+                        return (
+                          <div
+                            key={asset.id}
+                            onPointerDown={(e) =>
+                              handlePointerDownItem(
+                                e,
+                                layer.id,
+                                asset.id,
+                                "asset",
+                              )
+                            }
+                            onContextMenu={(e) =>
+                              handleRemoveItem(e, layer.id, asset.id, "asset")
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            className={`absolute flex items-center justify-center overflow-hidden cursor-move pointer-events-auto transition-all group hover:outline hover:outline-2 hover:outline-red-500`}
+                            style={{
+                              left: `${asset.x}px`,
+                              top: `${asset.y}px`,
+                              width: `${cache?.width}px`,
+                              height: `${cache?.height}px`,
+                            }}
+                          >
+                            {cache?.url && (
+                              <div
+                                className="rendering-pixelated w-full h-full"
+                                style={{
+                                  backgroundImage: `url(${cache.url})`,
+                                  backgroundPosition: `-${cache.offsetX}px -${cache.offsetY}px`,
+                                  backgroundRepeat: "no-repeat",
+                                }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
 
+                    {layer.instances.map((inst) => {
+                      const cache = getCachedSprite(inst.objectId);
                       return (
                         <div
                           key={inst.id}
                           onPointerDown={(e) =>
-                            handlePointerDownInstance(e, layer.id, inst.id)
+                            handlePointerDownItem(
+                              e,
+                              layer.id,
+                              inst.id,
+                              "instance",
+                            )
                           }
                           onContextMenu={(e) =>
-                            handleRemoveInstance(e, layer.id, inst.id)
+                            handleRemoveItem(e, layer.id, inst.id, "instance")
                           }
                           onClick={(e) => e.stopPropagation()}
-                          className={`absolute flex items-center justify-center overflow-hidden cursor-move pointer-events-auto transition-all group hover:outline hover:outline-2 hover:outline-red-500 ${draggingInst?.instId === inst.id ? "opacity-80 z-50 scale-105 shadow-xl" : ""}`}
+                          className={`absolute flex items-center justify-center overflow-hidden cursor-move pointer-events-auto transition-all group hover:outline hover:outline-2 hover:outline-red-500`}
                           style={{
                             left: `${inst.x}px`,
                             top: `${inst.y}px`,
@@ -988,11 +1018,10 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                               ? "transparent"
                               : "rgba(59, 130, 246, 0.8)",
                           }}
-                          title={`${layer.name}\n${objLabel}`}
                         >
                           {cache?.url ? (
                             <div
-                              className="rendering-pixelated w-full h-full group-hover:opacity-60 transition-opacity"
+                              className="rendering-pixelated w-full h-full"
                               style={{
                                 backgroundImage: `url(${cache.url})`,
                                 backgroundPosition: `-${cache.offsetX}px -${cache.offsetY}px`,
@@ -1004,7 +1033,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                               icon="Object"
                               width={16}
                               height={16}
-                              className="text-white group-hover:text-red-200"
+                              className="text-white"
                             />
                           )}
                         </div>
@@ -1019,7 +1048,7 @@ const RoomEditor = ({ windowData }: EditorProps) => {
               !isPanning &&
               !draggingInst &&
               ghostSprite &&
-              activeLayer?.type === "instances" && (
+              activeLayer?.type !== "background" && (
                 <div
                   className="absolute opacity-50 pointer-events-none z-50 transition-all duration-75"
                   style={{
@@ -1045,16 +1074,15 @@ const RoomEditor = ({ windowData }: EditorProps) => {
                 </div>
               )}
 
-            {/* Camera View Indicator */}
             <div
-              className="absolute top-0 left-0 border-2 border-red-500 pointer-events-none flex items-start justify-start p-1"
+              className="absolute top-0 left-0 border-2 border-red-500 pointer-events-none flex items-start justify-start p-1 z-50 shadow-[0_0_0_1px_rgba(0,0,0,0.5)]"
               style={{
                 width: `${camera.width}px`,
                 height: `${camera.height}px`,
                 transform: `translate(${camera.x}px, ${camera.y}px)`,
               }}
             >
-              <span className="text-red-500 font-bold text-[10px] bg-black/50 px-1 rounded">
+              <span className="text-red-500 font-bold text-[10px] bg-black/80 px-1.5 py-0.5 rounded backdrop-blur-sm">
                 Camera View
               </span>
             </div>

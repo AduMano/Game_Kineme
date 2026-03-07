@@ -31,14 +31,13 @@ export const RenderGamePage = () => {
 
       const scripts = findItems("Script", resources);
       const sprites = findItems("Image", resources);
-      let globalCode = ""; // 1.5 CREATE GLOBAL SPRITES DICTIONARY
-      // This allows you to type this.spriteId = Sprites.PlayerRun
+      let globalCode = "";
 
+      // 1. CREATE GLOBAL SPRITES DICTIONARY
       globalCode += `window.Sprites = {\n`;
       sprites.forEach((s) => {
-        // Strip spaces/symbols so it becomes a valid JavaScript property name
         const cleanName = s.label.replace(/[^a-zA-Z0-9]/g, "");
-        globalCode += `  "${cleanName}": "${s.id}",\n`;
+        globalCode += `  "${cleanName}": "${s.id}",\n`;
       });
       globalCode += `};\n`;
 
@@ -47,15 +46,15 @@ export const RenderGamePage = () => {
           const pureCode = script.data.code
             .replace(/^export\s+const\s+\w+\s+=\s+`/, "")
             .replace(/`;\s*$/, "");
-
           globalCode += `\n/* --- ${script.label} --- */\n${pureCode}\n`;
         }
       });
 
       const scriptTag = document.createElement("script");
       scriptTag.innerHTML = globalCode;
-      document.head.appendChild(scriptTag); // 2. FIND DEFAULT ROOM
+      document.head.appendChild(scriptTag);
 
+      // 2. FIND DEFAULT ROOM
       const rooms = findItems("Room", resources);
       const defaultRoom =
         rooms.find((r) => r.data?.roomProps?.isDefault) || rooms[0];
@@ -66,7 +65,7 @@ export const RenderGamePage = () => {
       const camData = roomData.camera;
 
       canvas.width = camData.width;
-      canvas.height = camData.height; // Initialize Camera from Room Properties if window.Camera exists
+      canvas.height = camData.height;
 
       if (window.Camera) {
         window.Camera.x = camData.x;
@@ -75,8 +74,9 @@ export const RenderGamePage = () => {
         window.Camera.height = camData.height;
         window.Camera.roomWidth = roomProps.width;
         window.Camera.roomHeight = roomProps.height;
-      } // 3. PRE-LOAD ALL IMAGE ASSETS FROM INDEXEDDB
+      }
 
+      // 3. PRE-LOAD ASSETS
       const imageCache: Record<string, HTMLImageElement> = {};
       const loadPromises: Promise<void>[] = [];
 
@@ -90,7 +90,7 @@ export const RenderGamePage = () => {
                 img.onload = () => resolve();
                 img.onerror = () => {
                   console.warn(`Failed to load image asset: ${assetId}`);
-                  resolve(); // Resolve anyway so the engine doesn't freeze!
+                  resolve();
                 };
                 img.src = URL.createObjectURL(blob);
                 imageCache[assetId] = img;
@@ -102,13 +102,16 @@ export const RenderGamePage = () => {
       });
 
       await Promise.all(loadPromises);
-      if (!isRunning) return; // Prevent memory leak if user closed tab during load
-      setIsLoading(false); // 4. INSTANTIATE OBJECTS AND COMPILE CODE
+      if (!isRunning) return;
+      setIsLoading(false);
 
+      // 4. INSTANTIATE OBJECTS (DO NOT REVERSE HERE!)
       const objects = findItems("Object", resources);
       const liveInstances: KinemeInstance[] = [];
 
-      roomData.layers.forEach((layer: any) => {
+      roomData.layers.forEach((layer: any, layerIndex: number) => {
+        const safeLayerId = layer.id || `layer_${layerIndex}`;
+
         if (layer.type === "instances" && layer.visible) {
           layer.instances.forEach((inst: any) => {
             const baseObj = objects.find((o) => o.id === inst.objectId);
@@ -118,12 +121,11 @@ export const RenderGamePage = () => {
               ? sprites.find((s) => s.id === baseObj.data.spriteId)
               : null;
             const sprProps = spriteResource?.data?.spriteProps || null;
-            const assetId = spriteResource?.data?.assetId || null;
 
             const liveObj = {
               id: inst.id,
-              layerId: layer.id, // Track layer for parallax ordering!
-              spriteId: baseObj.data?.spriteId || null, // Dynamic sprite tracking!
+              layerId: safeLayerId,
+              spriteId: baseObj.data?.spriteId || null,
               x: inst.x,
               y: inst.y,
               width: sprProps?.width || 32,
@@ -134,8 +136,6 @@ export const RenderGamePage = () => {
               alpha: 1,
               animationSpeed: 1,
               tint: "#ffffff",
-              spriteProps: sprProps,
-              assetId: assetId,
               visible: true,
               _destroyed: false,
               destroy: function () {
@@ -151,7 +151,7 @@ export const RenderGamePage = () => {
               const onStepFunc = new Function(
                 "self",
                 baseObj.data?.events?.onStep || "",
-              ); // THIS IS THE MAGIC: Bind the function to 'this' AND pass it as 'self'
+              );
 
               liveObj.onCreate = function () {
                 onCreateFunc.call(this, this);
@@ -169,103 +169,159 @@ export const RenderGamePage = () => {
             }
           });
         }
-      }); // FIRE ALL ONCREATE EVENTS
+      });
 
       liveInstances.forEach((inst) => {
         if (inst.onCreate) inst.onCreate();
-      }); // 5. THE MASTER GAME LOOP
+      });
 
+      // 5. THE MASTER GAME LOOP
       const gameLoop = (time: number) => {
-        if (!isRunning) return; // --- UPDATE PHASE ---
+        if (!isRunning) return;
 
         if (window.Camera && window.Camera.update) window.Camera.update();
 
         liveInstances.forEach((inst) => {
           if (!inst._destroyed && inst.onStep) inst.onStep();
-        }); // --- DRAW PHASE ---
+        });
 
+        // --- DRAW PHASE ---
         ctx.fillStyle = "#000000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height); // SAVE #1: Save the raw canvas state before moving the camera
-
-        ctx.save(); // Handle Camera offset (Math.round prevents pixel jitter!)
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         const camX = Math.round(window.Camera ? window.Camera.x : camData.x);
         const camY = Math.round(window.Camera ? window.Camera.y : camData.y);
-        ctx.translate(-camX, -camY); // Draw Backgrounds
 
-        roomData.layers.forEach((layer: any) => {
-          if (layer.type === "background" && layer.visible) {
+        // SAFE REVERSE LOOP: We count backwards manually so layerIndex perfectly matches the instantiation phase!
+        for (let i = roomData.layers.length - 1; i >= 0; i--) {
+          const layer = roomData.layers[i];
+          if (!layer.visible) continue;
+
+          const safeLayerId = layer.id || `layer_${i}`;
+
+          ctx.save();
+          ctx.translate(-camX, -camY);
+
+          // A. BACKGROUND LAYERS (Affected by Parallax)
+          if (layer.type === "background") {
             const spriteNodeId =
               layer.backgroundAssetId ||
               layer.spriteId ||
               layer.backgroundSpriteId;
-
             if (spriteNodeId) {
               const spriteResource = sprites.find((s) => s.id === spriteNodeId);
               const actualAssetId = spriteResource?.data?.assetId;
 
-              if (actualAssetId) {
-                const bgImg = imageCache[actualAssetId];
-
-                if (bgImg) {
-                  const px =
-                    camX *
-                    (layer.parallaxX !== undefined ? layer.parallaxX : 1);
-                  const py =
-                    camY *
-                    (layer.parallaxY !== undefined ? layer.parallaxY : 1);
-
-                  ctx.drawImage(bgImg, px, py);
-                }
+              if (actualAssetId && imageCache[actualAssetId]) {
+                const pX = layer.parallaxX !== undefined ? layer.parallaxX : 1;
+                const pY = layer.parallaxY !== undefined ? layer.parallaxY : 1;
+                ctx.drawImage(imageCache[actualAssetId], camX * pX, camY * pY);
               }
             }
           }
-        }); // Draw Instances (WITH ANIMATION LOGIC)
 
-        liveInstances.forEach((inst) => {
-          if (inst._destroyed || !inst.visible || !inst.assetId) return;
-          const img = imageCache[inst.assetId];
-          const sp = inst.spriteProps;
-          if (!img || !sp) return;
+          // B. DECORATOR / ASSETS LAYERS (Affected by Parallax)
+          else if (
+            (layer.type === "assets" || layer.type === "decorator") &&
+            layer.assets
+          ) {
+            const pX = layer.parallaxX !== undefined ? layer.parallaxX : 0;
+            const pY = layer.parallaxY !== undefined ? layer.parallaxY : 0;
 
-          const totalFrames = sp.rows * sp.cols;
-          let currentFrame = 0;
+            layer.assets.forEach((asset: any) => {
+              const spriteResource = sprites.find(
+                (s) => s.id === asset.spriteId,
+              );
+              const actualAssetId = spriteResource?.data?.assetId;
+              const sp = spriteResource?.data?.spriteProps;
 
-          if (totalFrames > 1 && sp.fps > 0 && inst.animationSpeed > 0) {
-            const frameDuration = 1000 / (sp.fps * inst.animationSpeed);
-            currentFrame = Math.floor(time / frameDuration) % totalFrames;
+              if (actualAssetId && imageCache[actualAssetId] && sp) {
+                ctx.save();
+                ctx.translate(asset.x + camX * pX, asset.y + camY * pY);
+
+                if (asset.angle) ctx.rotate((asset.angle * Math.PI) / 180);
+                if (asset.scaleX !== undefined || asset.scaleY !== undefined)
+                  ctx.scale(asset.scaleX ?? 1, asset.scaleY ?? 1);
+                if (asset.alpha !== undefined && asset.alpha !== 1)
+                  ctx.globalAlpha = asset.alpha;
+
+                ctx.drawImage(
+                  imageCache[actualAssetId],
+                  sp.offsetX,
+                  sp.offsetY,
+                  sp.width,
+                  sp.height,
+                  -sp.originX,
+                  -sp.originY,
+                  sp.width,
+                  sp.height,
+                );
+                ctx.restore();
+              }
+            });
           }
 
-          const col = currentFrame % sp.cols;
-          const row = Math.floor(currentFrame / sp.cols);
+          // C. INSTANCES LAYERS (EXPLICITLY BLOCKS PARALLAX!)
+          else if (layer.type === "instances") {
+            liveInstances.forEach((inst) => {
+              // Now safeLayerId is guaranteed to match!
+              if (
+                inst._destroyed ||
+                !inst.visible ||
+                inst.layerId !== safeLayerId
+              )
+                return;
 
-          const sx = sp.offsetX + col * (sp.width + sp.gap);
-          const sy = sp.offsetY + row * (sp.height + sp.gap); // SAVE #2: Save camera state before moving object
+              const activeSpriteResource = inst.spriteId
+                ? sprites.find((s) => s.id === inst.spriteId)
+                : null;
+              const sp = activeSpriteResource?.data?.spriteProps;
+              const assetId = activeSpriteResource?.data?.assetId;
 
-          ctx.save(); // 1. Move the canvas origin to the object's exact x/y position
+              if (!assetId || !imageCache[assetId] || !sp) return;
 
-          ctx.translate(inst.x, inst.y);
+              const totalFrames = sp.rows * sp.cols;
+              let currentFrame = 0;
 
-          if (inst.angle !== 0) ctx.rotate((inst.angle * Math.PI) / 180);
-          if (inst.scaleX !== 1 || inst.scaleY !== 1)
-            ctx.scale(inst.scaleX, inst.scaleY);
-          if (inst.alpha !== 1) ctx.globalAlpha = inst.alpha; // Now draw the image relative to the new origin (-originX and -originY)
+              if (totalFrames > 1 && sp.fps > 0 && inst.animationSpeed > 0) {
+                const frameDuration = 1000 / (sp.fps * inst.animationSpeed);
+                currentFrame = Math.floor(time / frameDuration) % totalFrames;
+              }
 
-          ctx.drawImage(
-            img,
-            sx,
-            sy,
-            sp.width,
-            sp.height,
-            -sp.originX,
-            -sp.originY,
-            sp.width,
-            sp.height,
-          ); // RESTORE #2: Restore back to camera state
+              const col = currentFrame % sp.cols;
+              const row = Math.floor(currentFrame / sp.cols);
+              const sx = sp.offsetX + col * (sp.width + sp.gap);
+              const sy = sp.offsetY + row * (sp.height + sp.gap);
+
+              ctx.save();
+
+              // NO PARALLAX. Pure World Coordinates!
+              ctx.translate(inst.x, inst.y);
+
+              if (inst.angle !== 0) ctx.rotate((inst.angle * Math.PI) / 180);
+              if (inst.scaleX !== 1 || inst.scaleY !== 1)
+                ctx.scale(inst.scaleX, inst.scaleY);
+              if (inst.alpha !== 1) ctx.globalAlpha = inst.alpha;
+
+              ctx.drawImage(
+                imageCache[assetId],
+                sx,
+                sy,
+                sp.width,
+                sp.height,
+                -sp.originX,
+                -sp.originY,
+                sp.width,
+                sp.height,
+              );
+
+              ctx.restore();
+            });
+          }
+
           ctx.restore();
-        });
+        } // End of Layer For-Loop
 
-        ctx.restore();
         if (window.Input && window.Input.update) window.Input.update();
         animationFrameId = requestAnimationFrame(gameLoop);
       };
@@ -284,32 +340,30 @@ export const RenderGamePage = () => {
   if (error) {
     return (
       <div className="w-screen h-screen bg-black text-red-500 flex items-center justify-center font-bold text-xl select-none">
-                Error: {error}     {" "}
+        Error: {error}
       </div>
     );
   }
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center overflow-hidden select-none relative">
-            {/* Loading Overlay is now separate from the canvas! */}     {" "}
       {isLoading && (
         <div className="absolute inset-0 z-50 bg-black flex items-center justify-center text-white text-xl animate-pulse font-bold tracking-widest">
-                    Compiling Game...        {" "}
+          Compiling Game...
         </div>
       )}
-           {" "}
+
       <canvas
         ref={canvasRef}
         style={{
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          imageRendering: "pixelated", // Opacity transition makes it fade in beautifully when compiling finishes!
+          imageRendering: "pixelated",
           opacity: isLoading ? 0 : 1,
           transition: "opacity 0.3s ease-in-out",
         }}
       />
-         {" "}
     </div>
   );
 };
